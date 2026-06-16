@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Python env and caches
+.venv/
+__pycache__/
+.pycache/
+.pycache_local/
+*.pyc
+
+# Local tool/runtime artifacts
+.codex/
+.mpl-cache-test/
+.mplconfig/
+.tools/python_packages/
+.tools/python_packages.backup/
+tmp/
+artifacts/
+
+# Strategy outputs and local runtime state
+momentum_backtest/output/
+domestic_etf_defensive_backtest/output/
+international_ma_backtest/output/
+international_risk_parity_backtest/output/
+international_all_weather_backtest/output/
+
+# Misc local-only directories
+spark_debug_upload/
+specs/

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CLI_BIN="$ROOT_DIR/.tools/lark-cli/node_modules/.bin/lark-cli"
+
+exec "$CLI_BIN" "$@"
