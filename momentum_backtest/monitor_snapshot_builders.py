@@ -29,6 +29,7 @@ try:
         build_default_strategy_params,
         build_signal_quality_score,
         choose_signal_winner_with_margin,
+        filter_score_row_by_confirmation,
         normalize_code,
         resolve_strategy_universe,
     )
@@ -53,6 +54,7 @@ except ImportError:
         build_default_strategy_params,
         build_signal_quality_score,
         choose_signal_winner_with_margin,
+        filter_score_row_by_confirmation,
         normalize_code,
         resolve_strategy_universe,
     )
@@ -92,12 +94,18 @@ def build_leader_context(
     )
     risk_score = score[active_risk_codes]
     defensive_score = score[active_defensive_codes]
+    risk_confirmation = None
+    if int(params.get('signal_confirmation_lookback', 0)) > 0 and int(params.get('signal_confirmation_top_n', 0)) > 0:
+        risk_confirmation = prices[active_risk_codes] / prices[active_risk_codes].shift(int(params.get('signal_confirmation_lookback', 0))) - 1
     prev_risk = None
     prev_def = None
     risk_leader = None
     def_leader = None
     for dt in prices.index:
-        risk_leader = choose_signal_winner_with_margin(risk_score.loc[dt], prev_risk, float(params.get('signal_leader_margin', 0.0)))
+        risk_score_row = risk_score.loc[dt]
+        if risk_confirmation is not None:
+            risk_score_row = filter_score_row_by_confirmation(risk_score_row, risk_confirmation.loc[dt], int(params.get('signal_confirmation_top_n', 0)))
+        risk_leader = choose_signal_winner_with_margin(risk_score_row, prev_risk, float(params.get('signal_leader_margin', 0.0)))
         def_leader = choose_signal_winner_with_margin(defensive_score.loc[dt], prev_def, float(params.get('signal_leader_margin', 0.0)))
         prev_risk = str(risk_leader) if risk_leader else None
         prev_def = str(def_leader) if def_leader else None
@@ -276,12 +284,14 @@ def build_position_and_trade_context(
         if "top2_close_risk_cap" in result.columns and pd.notna(result.loc[latest_idx, "top2_close_risk_cap"]):
             top2_close_risk_cap = float(result.loc[latest_idx, "top2_close_risk_cap"])
 
-    extra_cap_triggered = (
-        current_signal_code_norm is not None
-        and base_exposure is not None
-        and desired_exposure is not None
-        and base_exposure > desired_exposure
-    )
+    extra_cap_triggered = False
+    extra_cap_reason = None
+    if "extra_cap_reason" in result.columns and latest_idx in result.index and pd.notna(result.loc[latest_idx, "extra_cap_reason"]):
+        extra_cap_reason = str(result.loc[latest_idx, "extra_cap_reason"])
+    if "extra_cap_triggered" in result.columns and latest_idx in result.index:
+        extra_cap_triggered = bool(result.loc[latest_idx, "extra_cap_triggered"])
+    elif extra_cap_reason is not None:
+        extra_cap_triggered = True
 
     trade_rows = pd.DataFrame()
     confirmed_trade_date = None
@@ -348,6 +358,7 @@ def build_position_and_trade_context(
         "top2_close_gap": top2_close_gap,
         "top2_close_risk_cap": top2_close_risk_cap,
         "extra_cap_triggered": extra_cap_triggered,
+        "extra_cap_reason": extra_cap_reason,
         "confirmed_trade_date": confirmed_trade_date,
         "trade_previous_allocations": trade_previous_allocations,
         "trade_current_allocations": trade_current_allocations,
@@ -468,6 +479,7 @@ def build_signal_snapshot(
     top2_close_gap = position_and_trade["top2_close_gap"]
     top2_close_risk_cap = position_and_trade["top2_close_risk_cap"]
     extra_cap_triggered = position_and_trade["extra_cap_triggered"]
+    extra_cap_reason = position_and_trade["extra_cap_reason"]
     confirmed_trade_date = position_and_trade["confirmed_trade_date"]
     trade_previous_allocations = position_and_trade["trade_previous_allocations"]
     trade_current_allocations = position_and_trade["trade_current_allocations"]
@@ -482,6 +494,7 @@ def build_signal_snapshot(
         base_exposure=base_exposure,
         desired_exposure=desired_exposure,
         extra_cap_triggered=extra_cap_triggered,
+        extra_cap_reason=extra_cap_reason,
         top2_close_cap_triggered=top2_close_cap_triggered,
         top2_close_gap=top2_close_gap,
         top2_close_risk_cap=top2_close_risk_cap,
@@ -513,6 +526,7 @@ def build_signal_snapshot(
         base_exposure=base_exposure,
         desired_exposure=desired_exposure,
         extra_cap_triggered=extra_cap_triggered,
+        extra_cap_reason=extra_cap_reason,
         top2_close_cap_triggered=top2_close_cap_triggered,
         top2_close_gap=top2_close_gap,
         top2_close_risk_cap=top2_close_risk_cap,
@@ -600,6 +614,7 @@ def build_signal_snapshot(
         entry_advice=risk_context["entry_advice"],
         extra_cap_triggered=extra_cap_triggered,
         extra_cap_label=str(strategy_config["extra_cap_label"]),
+        extra_cap_reason=extra_cap_reason,
         top2_close_cap_triggered=top2_close_cap_triggered,
         top2_close_gap=top2_close_gap,
         top2_close_risk_cap=top2_close_risk_cap,

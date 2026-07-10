@@ -12,8 +12,12 @@ __pycache__/
 .codex/
 .mpl-cache-test/
 .mplconfig/
+.opencode/
+.playwright-mcp/
+.ttadk/
 .tools/python_packages/
 .tools/python_packages.backup/
+.tools/lark-cli/node_modules/
 tmp/
 artifacts/
 
@@ -23,7 +27,18 @@ domestic_etf_defensive_backtest/output/
 international_ma_backtest/output/
 international_risk_parity_backtest/output/
 international_all_weather_backtest/output/
+a_share_industry_etf_momentum_backtest/output/
+stock_multi_queue_backtest/output/
 
 # Misc local-only directories
 spark_debug_upload/
 specs/
+
+# Local IDE/assistant scratch files
+ai-plugin.json
+ai-plugin-lock.json
+CODEX_COLLABORATION_MANUAL.md
+MEMORY.md
+hello.py
+theme-config.json
+screenshot-*.png

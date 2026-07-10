@@ -56,10 +56,12 @@ try:
         load_delivery_progress_for_bundle,
         load_state,
         save_state,
-        send_message_bundle,
+        send_card_bundle,
         state_uses_message_cache,
     )
     from .monitor_render import (
+        build_market_card,
+        build_trade_card,
         format_market_message,
         format_trade_message,
     )
@@ -96,10 +98,12 @@ except ImportError:
         load_delivery_progress_for_bundle,
         load_state,
         save_state,
-        send_message_bundle,
+        send_card_bundle,
         state_uses_message_cache,
     )
     from monitor_render import (
+        build_market_card,
+        build_trade_card,
         format_market_message,
         format_trade_message,
     )
@@ -117,6 +121,11 @@ WEBHOOK_MAX_RETRIES = 3
 REGIME_MIN_SAMPLE_COUNT = 20
 ALLOCATION_DISPLAY_DIGITS = 1
 MONITOR_RUN_LOG = MONITOR_OUTPUT_DIR / "daily_monitor.run.log"
+FORMAL_DELIVERY_SLOTS: tuple[tuple[int, int, str], ...] = (
+    (9, 40, "0940"),
+    (12, 10, "1210"),
+    (14, 50, "1450"),
+)
 
 
 def log(message: str) -> None:
@@ -131,6 +140,16 @@ def log(message: str) -> None:
 
 def fetch_realtime_prices() -> dict[str, float]:
     return fetch_realtime_etf_prices()
+
+
+def infer_delivery_slot(now: datetime) -> str | None:
+    current_hhmm = now.hour * 100 + now.minute
+    active_slot: str | None = None
+    for hour, minute, slot_name in FORMAL_DELIVERY_SLOTS:
+        slot_hhmm = hour * 100 + minute
+        if current_hhmm >= slot_hhmm:
+            active_slot = slot_name
+    return active_slot
 
 
 def fetch_latest_raw_closes(selected_pool: list[dict[str, object]], today: date) -> dict[str, float]:
@@ -235,6 +254,7 @@ class SignalSnapshot:
     entry_advice: str | None
     extra_cap_triggered: bool
     extra_cap_label: str
+    extra_cap_reason: str | None
     top2_close_cap_triggered: bool
     top2_close_gap: float | None
     top2_close_risk_cap: float | None
@@ -338,7 +358,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--preview-send", action="store_true", help="发送当前快照但不读写去重状态；人工补发默认应使用这个参数，不影响后续正式定时通知。")
     parser.add_argument("--debug", action="store_true", help="输出调试日志到 stderr。")
     parser.add_argument("--webhook-url", type=str, default="", help="临时指定飞书机器人 webhook。")
-    parser.add_argument("--disable-direct-feishu", action="store_true", help="关闭直连飞书私信，仅保留 webhook。")
+    parser.set_defaults(disable_direct_feishu=True)
+    parser.add_argument("--disable-direct-feishu", dest="disable_direct_feishu", action="store_true", help="关闭直连飞书私信，仅保留 webhook（默认）。")
+    parser.add_argument("--enable-direct-feishu", dest="disable_direct_feishu", action="store_false", help="开启直连飞书私信，与 webhook 并行发送。")
     return parser.parse_args()
 
 
@@ -409,12 +431,16 @@ def main() -> int:
         raw_closes,
         now,
     )
+    snapshot.delivery_slot = infer_delivery_slot(now)
     market_message = format_market_message(snapshot)
     trade_message = format_trade_message(snapshot)
+    market_card = build_market_card(snapshot)
+    trade_card = build_trade_card(snapshot)
     message_bundle = [market_message, trade_message]
     log(
         f"snapshot ready: trade_date={snapshot.trade_date}, session={market_session_label}, "
-        f"holding={snapshot.current_holding}, desired={snapshot.desired_holding}, exposure={snapshot.current_exposure}"
+        f"holding={snapshot.current_holding}, desired={snapshot.desired_holding}, exposure={snapshot.current_exposure}, "
+        f"slot={snapshot.delivery_slot or 'manual'}"
     )
     state = {} if args.preview_send else load_state(state_file)
     channels = build_channel_plan(disable_direct_feishu=args.disable_direct_feishu, webhook_url=webhook_url)
@@ -458,8 +484,8 @@ def main() -> int:
             trade_message,
             delivery_progress=progress,
         )
-    final_progress = send_message_bundle(
-        message_bundle,
+    final_progress = send_card_bundle(
+        [market_card, trade_card],
         disable_direct_feishu=args.disable_direct_feishu,
         webhook_url=webhook_url,
         delivery_progress=delivery_progress,

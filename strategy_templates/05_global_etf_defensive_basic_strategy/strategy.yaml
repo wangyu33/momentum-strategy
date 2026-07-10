@@ -1,0 +1,90 @@
+strategy_name: global_etf_defensive_base_v1
+strategy_type: monthly_taa_defensive
+
+objective:
+  description: >-
+    在宽基ETF中保留趋势向上的风险暴露，在弱市时自动退守到国债ETF或现金类ETF，
+    并用波动率缩放压低大回撤阶段的仓位。
+  target_user:
+    - 中长期ETF配置账户
+    - 希望降低股票大回撤的稳健型账户
+
+rebalance:
+  frequency: monthly
+  signal_time: month_end_close
+  execution_time: next_open
+
+universe:
+  risk_assets:
+    - SPY
+    - VEA
+    - VWO
+    - VNQ
+  defensive_assets:
+    treasury_intermediate: IEF
+    treasury_cash: SGOV
+    gold_optional: GLD
+
+signals:
+  relative_momentum:
+    metric: total_return_12m_exclude_1m
+    choose: top_1
+    apply_to: risk_assets
+  absolute_filter:
+    conditions:
+      - metric: total_return_12m_exclude_1m
+        operator: '>'
+        value: 0.0
+      - metric: close_vs_10m_ma
+        operator: '>'
+        value: 0.0
+  volatility_target:
+    lookback_days: 20
+    annual_target_vol: 0.10
+    max_risk_weight: 1.0
+    leverage: false
+
+allocation_rules:
+  risk_on:
+    when: winner_passes_absolute_filter
+    risk_weight_formula: min(1.0, annual_target_vol / realized_vol_20d)
+    residual_weight:
+      default:
+        IEF: 1.0
+      balanced_defense:
+        IEF: 0.7
+        GLD: 0.3
+  risk_off:
+    when: winner_fails_absolute_filter
+    default:
+      IEF: 0.7
+      SGOV: 0.3
+    conservative_mode:
+      SGOV: 1.0
+  treasury_fail_safe:
+    when:
+      - regime: risk_off
+      - asset: IEF
+        metric: close_vs_10m_ma
+        operator: '<='
+        value: 0.0
+    override:
+      SGOV: 1.0
+
+risk_controls:
+  no_leverage: true
+  max_single_rebalance_turnover: 1.0
+  optional_transaction_cost_model:
+    enabled: true
+    one_way_fee_bps: 2
+    slippage_bps: 2
+
+notes:
+  strengths:
+    - 规则简单，容易回测和实现
+    - 同时兼容宽基ETF和债券ETF
+    - 比纯买入持有更强调回撤控制
+  weaknesses:
+    - 横盘震荡会有打脸成本
+    - 债券失效阶段需要现金替代保护
+    - 参数仍需按市场和数据口径验证

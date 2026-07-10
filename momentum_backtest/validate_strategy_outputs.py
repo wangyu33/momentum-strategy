@@ -2495,13 +2495,15 @@ def check_fine_tune_normalize_params_preserves_signal_context() -> CheckResult:
         normalized["proxy_kind"] == raw_params["proxy_kind"]
         and normalized["signal_quality_method"] == raw_params["signal_quality_method"]
         and abs(float(normalized["signal_slope_penalty"]) - float(raw_params["signal_slope_penalty"])) < FLOAT_TOL
+        and int(normalized["signal_confirmation_lookback"]) == int(raw_params["signal_confirmation_lookback"])
+        and int(normalized["signal_confirmation_top_n"]) == int(raw_params["signal_confirmation_top_n"])
         and abs(float(normalized["signal_leader_margin"]) - float(raw_params["signal_leader_margin"])) < FLOAT_TOL
         and list(normalized["risk_codes"]) == list(raw_params["risk_codes"])
         and list(normalized["defensive_codes"]) == list(raw_params["defensive_codes"])
     )
     detail = (
         f"proxy={normalized['proxy_kind']}, signal={normalized['signal_quality_method']}, "
-        f"slope={float(normalized['signal_slope_penalty']):.3f}, leader={float(normalized['signal_leader_margin']):.3f}, "
+        f"slope={float(normalized['signal_slope_penalty']):.3f}, confirm={int(normalized['signal_confirmation_lookback'])}/{int(normalized['signal_confirmation_top_n'])}, leader={float(normalized['signal_leader_margin']):.3f}, "
         f"risk={','.join(normalized['risk_codes'])}, defensive={','.join(normalized['defensive_codes'])}"
     )
     return CheckResult(name="fine_tune_normalize_params_context", passed=passed, detail=detail)

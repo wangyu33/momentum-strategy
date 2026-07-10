@@ -5,6 +5,7 @@ SRC_DIR="/Users/bytedance/Documents/trae_projects/wy_test"
 RUNTIME_DIR="$HOME/Library/Caches/wy_test_runtime"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 MONITOR_PLIST="$LAUNCH_AGENTS_DIR/com.codex.etf-momentum-monitor.plist"
+BOARD_PLIST="$LAUNCH_AGENTS_DIR/com.codex.etf-momentum-board.plist"
 BACKFILL_PLIST="$LAUNCH_AGENTS_DIR/com.codex.momentum-backfill.plist"
 GUI_UID="$(id -u)"
 
@@ -26,9 +27,12 @@ mkdir -p \
 touch \
   "$RUNTIME_DIR/momentum_backtest/output/daily_monitor.stdout.log" \
   "$RUNTIME_DIR/momentum_backtest/output/daily_monitor.stderr.log" \
+  "$RUNTIME_DIR/momentum_backtest/output/daily_momentum_board.stdout.log" \
+  "$RUNTIME_DIR/momentum_backtest/output/daily_momentum_board.stderr.log" \
   "$RUNTIME_DIR/momentum_backtest/output/run_backtest.stdout.log" \
   "$RUNTIME_DIR/momentum_backtest/output/run_backtest.stderr.log" \
-  "$RUNTIME_DIR/momentum_backtest/output/monitor/daily_monitor.run.log"
+  "$RUNTIME_DIR/momentum_backtest/output/monitor/daily_monitor.run.log" \
+  "$RUNTIME_DIR/momentum_backtest/output/monitor/daily_momentum_board.run.log"
 
 printf '[2/6] Validate runtime outputs\n'
 python3 "$RUNTIME_DIR/momentum_backtest/validate_strategy_outputs.py"
@@ -45,6 +49,7 @@ cat > "$MONITOR_PLIST" <<PLIST
     <array>
       <string>/usr/bin/python3</string>
       <string>$RUNTIME_DIR/momentum_backtest/daily_monitor.py</string>
+      <string>--disable-direct-feishu</string>
     </array>
     <key>WorkingDirectory</key>
     <string>$RUNTIME_DIR</string>
@@ -70,6 +75,39 @@ cat > "$MONITOR_PLIST" <<PLIST
     <string>$RUNTIME_DIR/momentum_backtest/output/daily_monitor.stdout.log</string>
     <key>StandardErrorPath</key>
     <string>$RUNTIME_DIR/momentum_backtest/output/daily_monitor.stderr.log</string>
+    <key>RunAtLoad</key>
+    <false/>
+  </dict>
+</plist>
+PLIST
+
+cat > "$BOARD_PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.codex.etf-momentum-board</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/usr/bin/python3</string>
+      <string>$RUNTIME_DIR/momentum_backtest/daily_momentum_board.py</string>
+      <string>--disable-direct-feishu</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>$RUNTIME_DIR</string>
+    <key>StartCalendarInterval</key>
+    <array>
+      <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>10</integer></dict>
+      <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>10</integer></dict>
+      <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>10</integer></dict>
+      <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>10</integer></dict>
+      <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>10</integer></dict>
+    </array>
+    <key>StandardOutPath</key>
+    <string>$RUNTIME_DIR/momentum_backtest/output/daily_momentum_board.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>$RUNTIME_DIR/momentum_backtest/output/daily_momentum_board.stderr.log</string>
     <key>RunAtLoad</key>
     <false/>
   </dict>
@@ -111,8 +149,10 @@ PLIST
 printf '[4/7] Reload LaunchAgents
 '
 launchctl bootout "gui/$GUI_UID/com.codex.etf-momentum-monitor" >/dev/null 2>&1 || true
+launchctl bootout "gui/$GUI_UID/com.codex.etf-momentum-board" >/dev/null 2>&1 || true
 launchctl bootout "gui/$GUI_UID/com.codex.momentum-backfill" >/dev/null 2>&1 || true
 launchctl bootstrap "gui/$GUI_UID" "$MONITOR_PLIST"
+launchctl bootstrap "gui/$GUI_UID" "$BOARD_PLIST"
 launchctl bootstrap "gui/$GUI_UID" "$BACKFILL_PLIST"
 
 printf '[5/7] Catch up missed slots after reload if needed
@@ -123,6 +163,7 @@ TODAY_YYYYMMDD="$(date +%Y%m%d)"
 TODAY_WEEKDAY="$(date +%u)"
 NOW_HHMM="$(date +%H%M)"
 MONITOR_STATE="$RUNTIME_DIR/momentum_backtest/output/monitor/daily_monitor_state.json"
+BOARD_STATE="$RUNTIME_DIR/momentum_backtest/output/monitor/daily_momentum_board_state.json"
 BACKTEST_NAV="$RUNTIME_DIR/momentum_backtest/output/core/backtest_nav.csv"
 
 file_mtime_same_day_after() {
@@ -166,11 +207,15 @@ maybe_catchup_slot() {
 maybe_catchup_slot "com.codex.etf-momentum-monitor" "0940" "0940" "$MONITOR_STATE"
 maybe_catchup_slot "com.codex.etf-momentum-monitor" "1210" "1210" "$MONITOR_STATE"
 maybe_catchup_slot "com.codex.etf-momentum-monitor" "1450" "1450" "$MONITOR_STATE"
+maybe_catchup_slot "com.codex.etf-momentum-board" "1510" "1510" "$BOARD_STATE"
 maybe_catchup_slot "com.codex.momentum-backfill" "1520" "1520" "$BACKTEST_NAV"
 
 printf '[6/7] Print registered jobs
 '
 launchctl print "gui/$GUI_UID/com.codex.etf-momentum-monitor" | sed -n '1,25p'
+printf '
+'
+launchctl print "gui/$GUI_UID/com.codex.etf-momentum-board" | sed -n '1,25p'
 printf '
 '
 launchctl print "gui/$GUI_UID/com.codex.momentum-backfill" | sed -n '1,25p'

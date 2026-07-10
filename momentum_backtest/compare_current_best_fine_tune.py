@@ -94,6 +94,8 @@ def normalize_params(raw_params: dict[str, object]) -> dict[str, object]:
         "proxy_kind": str(raw_params.get("proxy_kind", "hybrid_breadth_blend")),
         "signal_quality_method": str(raw_params.get("signal_quality_method", "raw")),
         "signal_slope_penalty": float(raw_params.get("signal_slope_penalty", 0.0)),
+        "signal_confirmation_lookback": int(raw_params.get("signal_confirmation_lookback", 0)),
+        "signal_confirmation_top_n": int(raw_params.get("signal_confirmation_top_n", 0)),
         "signal_leader_margin": float(raw_params.get("signal_leader_margin", 0.0)),
         "risk_codes": [str(code) for code in raw_params.get("risk_codes", [])],
         "defensive_codes": [str(code) for code in raw_params.get("defensive_codes", [])],

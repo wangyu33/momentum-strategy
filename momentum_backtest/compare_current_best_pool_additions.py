@@ -24,6 +24,7 @@ try:
         ETF_511380,
         ETF_512480,
         ETF_513030,
+        ETF_513080,
         ETF_515790,
         ETF_588000,
     )
@@ -39,6 +40,7 @@ except ImportError:
         ETF_511380,
         ETF_512480,
         ETF_513030,
+        ETF_513080,
         ETF_515790,
         ETF_588000,
     )
@@ -81,6 +83,8 @@ POOL_CHANGES = [
     {"pool": "plus_soymeal_159985", "kind": "add", "candidate_kind": "risk", "candidate": ETF_159985},
     {"pool": "plus_soymeal_159985_defensive", "kind": "add", "candidate_kind": "defensive", "candidate": ETF_159985},
     {"pool": "plus_germany_513030", "kind": "add", "candidate_kind": "risk", "candidate": ETF_513030},
+    {"pool": "plus_france_513080", "kind": "add", "candidate_kind": "risk", "candidate": ETF_513080},
+    {"pool": "plus_france_germany", "kind": "add_pair", "candidate_kind": "risk", "candidates": [ETF_513080, ETF_513030]},
     {"pool": "plus_kc50_588000", "kind": "add", "candidate_kind": "risk", "candidate": ETF_588000},
     {"pool": "plus_semiconductor_512480", "kind": "add", "candidate_kind": "risk", "candidate": ETF_512480},
     {"pool": "plus_solar_515790", "kind": "add", "candidate_kind": "risk", "candidate": ETF_515790},
@@ -111,6 +115,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--start-date", type=str, default="2012-01-01", help="分析起始日期。")
     parser.add_argument("--fee-rate", type=float, default=DEFAULT_FEE_RATE, help="单边手续费率。")
     parser.add_argument("--slippage-rate", type=float, default=DEFAULT_SLIPPAGE_RATE, help="单边滑点率。")
+    parser.add_argument("--pools", nargs="*", default=[], help="只评估指定 pool 名称。")
     return parser.parse_args()
 
 
@@ -166,6 +171,17 @@ def apply_pool_change(
         elif candidate_kind == "defensive":
             defensive_codes.append(candidate_code)
 
+    candidates = change.get("candidates", [])
+    for item in candidates:
+        selected = pd.concat([selected, pd.DataFrame([item])], ignore_index=True)
+        candidate_code = str(item["code"])
+        if candidate_code in effective_drop_codes:
+            effective_drop_codes = [code for code in effective_drop_codes if code != candidate_code]
+        if candidate_kind == "risk":
+            risk_codes.append(candidate_code)
+        elif candidate_kind == "defensive":
+            defensive_codes.append(candidate_code)
+
     selected = selected.drop_duplicates(subset=["code"], keep="last").reset_index(drop=True)
     risk_codes = list(dict.fromkeys(risk_codes))
     defensive_codes = list(dict.fromkeys(defensive_codes))
@@ -179,11 +195,13 @@ def main() -> int:
     base_drop_codes = list(DEFAULT_BASELINE_DROP_CODES)
     base_selected = load_default_strategy_backtest_pool().copy()
     market_proxy = load_market_volume_proxy(years=args.years, refresh=False)
+    pool_filters = set(args.pools)
+    changes_to_run = [change for change in POOL_CHANGES if not pool_filters or str(change["pool"]) in pool_filters]
 
     rows: list[dict[str, object]] = []
     nav_compare = pd.DataFrame()
 
-    for change in POOL_CHANGES:
+    for change in changes_to_run:
         pool_name = str(change["pool"])
         selected, risk_codes, defensive_codes, effective_drop_codes = apply_pool_change(base_selected, base_drop_codes, change)
         prices = fetch_histories(selected, years=args.years)

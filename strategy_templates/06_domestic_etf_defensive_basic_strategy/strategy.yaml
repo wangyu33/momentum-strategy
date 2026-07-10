@@ -1,0 +1,110 @@
+strategy_name: domestic_etf_defensive_base_v1
+strategy_type: daily_dual_momentum_defensive
+
+objective:
+  description: >-
+    在国内ETF可交易资产中，通过短中周期动量选择风险资产，在弱势阶段退守到防守池，
+    在极弱市切入十年国债ETF，并通过量能、广度、过热状态动态压低风险暴露。
+  target_user:
+    - 国内ETF轮动账户
+    - 希望控制回撤的中等风险账户
+
+rebalance:
+  frequency: daily_signal
+  execution_time: next_session_open
+  optional_mode: weekly_review
+
+universe:
+  risk_assets:
+    - code: '510300'
+      name: 沪深300ETF
+    - code: '159949'
+      name: 创业板50ETF
+    - code: '159954'
+      name: H股ETF
+    - code: '159941'
+      name: 纳指ETF
+    - code: '513880'
+      name: 日经ETF
+  defensive_assets:
+    - code: '518880'
+      name: 黄金ETF
+    - code: '512890'
+      name: 红利低波ETF
+    - code: '159985'
+      name: 豆粕ETF
+  stress_bond_asset:
+    code: '511260'
+    name: 十年国债ETF
+  optional_extra_defense:
+    - code: '511580'
+      name: 政金债ETF
+
+signals:
+  risk_selection:
+    lookback_days: 25
+    short_window_days: 5
+    quality_method: slope_penalty
+    slope_penalty: 0.85
+    formula: raw_momentum - 0.85 * clip(ret5 - raw_momentum / 5, lower=0)
+    choose: top_1
+  exposure_framework:
+    absolute_momentum_threshold: 0.05
+    weak_trend_defensive_weight: 0.80
+    rules:
+      - if: raw_momentum > 0.05
+        target: risk_winner
+        total_exposure: 1.0
+      - if: 0 < raw_momentum <= 0.05
+        target: defensive_winner
+        total_exposure: 0.8
+      - if: raw_momentum <= 0
+        target: defensive_winner
+        total_exposure: 1.0
+  top2_protection:
+    top2_close_gap: 0.005
+    top2_risk_cap: 0.70
+
+market_guard:
+  weak_market_filter:
+    volume_ratio_20_60_lt: 0.91
+    volume_ratio_5_20_lt: 0.90
+    breadth_proxy_lt: -0.04
+    effective_momentum_lte: 0.16
+    risk_cap: 0.0
+  stress_bond_overlay:
+    asset: '511260'
+    volume_ratio_20_60_lt: 0.90
+    breadth_proxy_lt: -0.031
+    risk_cap: 0.0
+    enter_days: 1
+    exit_days: 1
+
+overheat_guard:
+  pre_overheat_start_cut: 0.15
+  pre_overheat_end_cut: 0.20
+  pre_overheat_end_exposure: 0.90
+  overheat_drawdown_cut: -0.02
+  overheat_momentum_cut: 0.25
+  overheat_max_exposure: 0.30
+  overheat_high_momentum_cut: 0.30
+  overheat_high_max_exposure: 0.10
+  cap_mode: continuous
+
+risk_controls:
+  no_leverage: true
+  signal_vs_holding_must_be_distinguished: true
+  optional_transaction_cost_model:
+    enabled: true
+    one_way_fee_rate: 0.0003
+    one_way_slippage_rate: 0.0002
+
+notes:
+  strengths:
+    - 适合国内ETF市场结构
+    - 不把债券ETF当成唯一防守来源
+    - 与现有momentum_backtest实现口径兼容
+  weaknesses:
+    - 依赖市场广度和量能代理质量
+    - 海外QDII ETF时差会影响短期信号
+    - 仍属于趋势型防守而非预测型系统

@@ -169,20 +169,77 @@ def send_feishu_message(text: str) -> None:
     subprocess.run(cmd, check=True, env=build_lark_cli_env())
 
 
+def send_feishu_interactive_card(card: dict[str, object]) -> None:
+    cmd = [
+        "./scripts/lark-cli",
+        "im",
+        "+messages-send",
+        "--as",
+        "bot",
+        "--user-id",
+        FEISHU_OPEN_ID,
+        "--msg-type",
+        "interactive",
+        "--content",
+        json.dumps(card, ensure_ascii=False),
+        "--idempotency-key",
+        str(uuid.uuid4()),
+    ]
+    subprocess.run(cmd, check=True, env=build_lark_cli_env())
+
+
+def upload_feishu_image(image_path: str) -> str:
+    cmd = [
+        "./scripts/lark-cli",
+        "im",
+        "images",
+        "create",
+        "--as",
+        "bot",
+        "--params",
+        '{"image_type":"message"}',
+        "--file",
+        f"image={image_path}",
+    ]
+    result = subprocess.run(cmd, check=True, capture_output=True, text=True, env=build_lark_cli_env())
+    payload = json.loads(result.stdout)
+    image_key = str(payload.get("data", {}).get("image_key", "")).strip()
+    if not image_key:
+        raise RuntimeError(f"upload image failed: {result.stdout}")
+    return image_key
+
+
+def send_feishu_image(image_key: str) -> None:
+    cmd = [
+        "./scripts/lark-cli",
+        "im",
+        "+messages-send",
+        "--as",
+        "bot",
+        "--user-id",
+        FEISHU_OPEN_ID,
+        "--image",
+        image_key,
+        "--idempotency-key",
+        str(uuid.uuid4()),
+    ]
+    subprocess.run(cmd, check=True, env=build_lark_cli_env())
+
+
 def build_webhook_url(args) -> str:
     return args.webhook_url or os.getenv("DAILY_MONITOR_WEBHOOK_URL", DEFAULT_FEISHU_WEBHOOK)
 
 
-def send_webhook_message(text: str, webhook_url: str, log_fn: Callable[[str], None] | None = None) -> None:
+def _send_webhook_payload(payload: dict[str, object], webhook_url: str, log_fn: Callable[[str], None] | None = None) -> None:
     # 兼容本地测试与离线占位值：若 webhook 不是完整 URL，则视作 no-op 成功发送。
     if not str(webhook_url).startswith(("http://", "https://")):
         return
-    payload = json.dumps({"msg_type": "text", "content": {"text": text}}, ensure_ascii=False).encode("utf-8")
+    payload_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     last_error: RuntimeError | None = None
     for attempt in range(1, WEBHOOK_MAX_RETRIES + 1):
         request = urllib.request.Request(
             webhook_url,
-            data=payload,
+            data=payload_bytes,
             headers={"Content-Type": "application/json; charset=utf-8"},
             method="POST",
         )
@@ -212,6 +269,18 @@ def send_webhook_message(text: str, webhook_url: str, log_fn: Callable[[str], No
 
     if last_error is not None:
         raise last_error
+
+
+def send_webhook_message(text: str, webhook_url: str, log_fn: Callable[[str], None] | None = None) -> None:
+    _send_webhook_payload({"msg_type": "text", "content": {"text": text}}, webhook_url, log_fn=log_fn)
+
+
+def send_webhook_interactive_card(card: dict[str, object], webhook_url: str, log_fn: Callable[[str], None] | None = None) -> None:
+    _send_webhook_payload({"msg_type": "interactive", "card": card}, webhook_url, log_fn=log_fn)
+
+
+def send_webhook_image(image_key: str, webhook_url: str, log_fn: Callable[[str], None] | None = None) -> None:
+    _send_webhook_payload({"msg_type": "image", "content": {"image_key": image_key}}, webhook_url, log_fn=log_fn)
 
 
 def send_message_bundle(
@@ -270,6 +339,65 @@ def send_message_bundle(
         )
     if channels and not any(any(item.get(channel, False) for channel in channels) for item in progress):
         raise RuntimeError("all delivery channels failed for every message")
+    return progress
+
+
+def send_card_bundle(
+    cards: list[dict[str, object]],
+    *,
+    disable_direct_feishu: bool,
+    webhook_url: str,
+    delivery_progress: list[dict[str, bool]] | None = None,
+    progress_callback: Callable[[list[dict[str, bool]]], None] | None = None,
+    log_fn: Callable[[str], None] | None = None,
+) -> list[dict[str, bool]]:
+    channels = build_channel_plan(disable_direct_feishu=disable_direct_feishu, webhook_url=webhook_url)
+    progress = (
+        normalize_delivery_progress(delivery_progress, message_count=len(cards), channels=channels)
+        if delivery_progress is not None
+        else build_empty_delivery_progress(len(cards), channels)
+    )
+    webhook_failures = 0
+    direct_failures = 0
+    for index, card in enumerate(cards):
+        if log_fn is not None:
+            pending_channels = [channel for channel in channels if not progress[index].get(channel, False)]
+            log_fn(f"delivery start message {index + 1}/{len(cards)} pending={','.join(pending_channels) or 'none'}")
+        if "direct" in channels and not progress[index].get("direct", False):
+            try:
+                send_feishu_interactive_card(card)
+            except Exception as exc:
+                direct_failures += 1
+                if log_fn is not None:
+                    log_fn(f"direct feishu send failed for message {index + 1}/{len(cards)}: {exc}")
+            else:
+                progress[index]["direct"] = True
+                if log_fn is not None:
+                    log_fn(f"direct feishu sent message {index + 1}/{len(cards)}")
+                if progress_callback is not None:
+                    progress_callback(progress)
+        if "webhook" in channels and not progress[index].get("webhook", False):
+            try:
+                send_webhook_interactive_card(card, webhook_url, log_fn=log_fn)
+            except Exception as exc:
+                webhook_failures += 1
+                if log_fn is not None:
+                    log_fn(f"webhook send failed for message {index + 1}/{len(cards)}: {exc}")
+            else:
+                progress[index]["webhook"] = True
+                if log_fn is not None:
+                    log_fn(f"webhook sent message {index + 1}/{len(cards)}")
+                if progress_callback is not None:
+                    progress_callback(progress)
+                if index < len(cards) - 1:
+                    time.sleep(WEBHOOK_RETRY_SLEEP_SECONDS)
+    if log_fn is not None:
+        log_fn(
+            "delivery summary: "
+            f"messages={len(cards)}, direct_failures={direct_failures}, webhook_failures={webhook_failures}"
+        )
+    if channels and not any(any(item.get(channel, False) for channel in channels) for item in progress):
+        raise RuntimeError("all delivery channels failed for every card")
     return progress
 
 

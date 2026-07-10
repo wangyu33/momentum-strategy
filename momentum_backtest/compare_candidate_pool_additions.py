@@ -45,6 +45,7 @@ ETF_588000 = {"theme": "科创50", "code": "588000", "name": "科创50ETF华夏"
 ETF_513180 = {"theme": "恒生科技", "code": "513180", "name": "恒生科技指数ETF", "sina_symbol": "sh513180"}
 ETF_511260 = {"theme": "10年国债", "code": "511260", "name": "十年国债ETF", "sina_symbol": "sh511260"}
 ETF_513030 = {"theme": "德国ETF", "code": "513030", "name": "德国ETF", "sina_symbol": "sh513030"}
+ETF_513080 = {"theme": "法国ETF", "code": "513080", "name": "法国CAC40ETF", "sina_symbol": "sh513080"}
 ETF_513050 = {"theme": "中概互联", "code": "513050", "name": "中概互联网ETF", "sina_symbol": "sh513050"}
 ETF_511090 = {"theme": "30年国债", "code": "511090", "name": "30年国债ETF", "sina_symbol": "sh511090"}
 ETF_512480 = {"theme": "半导体", "code": "512480", "name": "半导体ETF", "sina_symbol": "sh512480"}
@@ -56,6 +57,8 @@ ETF_510900 = {"theme": "H股", "code": "510900", "name": "H股ETF", "sina_symbol
 ETF_510050 = {"theme": "上证50", "code": "510050", "name": "上证50ETF", "sina_symbol": "sh510050"}
 ETF_510230 = {"theme": "金融", "code": "510230", "name": "金融ETF", "sina_symbol": "sh510230"}
 ETF_510880 = {"theme": "红利ETF", "code": "510880", "name": "红利ETF", "sina_symbol": "sh510880"}
+ETF_164824 = {"theme": "印度", "code": "164824", "name": "印度基金LOF", "sina_symbol": "sz164824"}
+ETF_513400 = {"theme": "道琼斯", "code": "513400", "name": "道琼斯ETF鹏华", "sina_symbol": "sh513400"}
 
 BASE_RISK_CODES = ["510300", "159949", "159941", "513650", "513880"]
 BASE_DEFENSIVE_CODES = ["511580", "518880", "512890"]
@@ -372,6 +375,18 @@ def main() -> int:
             "defensive_codes": BASE_DEFENSIVE_CODES,
         },
         {
+            "name": "plus_india_lof",
+            "selected": pd.concat([base_pool, pd.DataFrame([ETF_164824])], ignore_index=True),
+            "risk_codes": BASE_RISK_CODES + ["164824"],
+            "defensive_codes": BASE_DEFENSIVE_CODES,
+        },
+        {
+            "name": "plus_dow",
+            "selected": pd.concat([base_pool, pd.DataFrame([ETF_513400])], ignore_index=True),
+            "risk_codes": BASE_RISK_CODES + ["513400"],
+            "defensive_codes": BASE_DEFENSIVE_CODES,
+        },
+        {
             "name": "replace_div_lowvol_with_dividend",
             "selected": pd.concat([base_without_lowvol, pd.DataFrame([ETF_510880])], ignore_index=True),
             "risk_codes": BASE_RISK_CODES,
@@ -459,6 +474,8 @@ def main() -> int:
     ax.plot(compare_df.index, compare_df["plus_hshares"], linewidth=1.8, label="+ H Shares")
     ax.plot(compare_df.index, compare_df["plus_sse50"], linewidth=1.8, label="+ SSE50")
     ax.plot(compare_df.index, compare_df["plus_financial"], linewidth=1.8, label="+ Financial")
+    ax.plot(compare_df.index, compare_df["plus_india_lof"], linewidth=1.8, label="+ India LOF")
+    ax.plot(compare_df.index, compare_df["plus_dow"], linewidth=1.8, label="+ Dow")
     ax.plot(compare_df.index, compare_df["replace_div_lowvol_with_dividend"], linewidth=1.8, label="Replace Div LowVol")
     ax.plot(compare_df.index, compare_df["hs300_benchmark"], linewidth=1.6, linestyle="--", label="HS300 ETF")
     ax.set_title("Candidate Pool Additions Comparison", loc="left", fontsize=16, fontweight="bold")

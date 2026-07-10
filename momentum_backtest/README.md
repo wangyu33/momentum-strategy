@@ -91,14 +91,15 @@
 
 当前默认基线不是最早的 plain threshold dual，而是：
 
-`regime_mix_rm511580_rm513650_slope085_volume_guard_ag28_co27_vr91_vs90_vb01_vg30_cap08_hi04_dd02_rm06_vm16_m15_20_c90_oh25_ohh30_cont_f30_l10_t2g05_t2r70__proxy_hybrid_breadth_blend_vr91_vs90_vb-2__edge_rc000_vg000_pc900_oc300_oh100__def159985__stressbond_511260_vr90_vb-1`
+`baseline_cf60top2`
 
 可以把它理解成 4 层规则叠加：
 
 1. 底层信号选择
-   先算风险资产的原始 `25` 日动量，再对“近 5 日涨得过陡”的标的做一层 `slope_085` 惩罚，最后按修正后的质量分数选第一名。
+   先算风险资产的原始 `25` 日动量，再对“近 5 日涨得过陡”的标的做一层 `slope_085` 惩罚；同时要求候选标的也进入风险池 `60` 日动量前 `2` 名，最后再按修正后的质量分数选第一名。
    - 原始动量：`price / price.shift(25) - 1`
    - 质量分数：`raw_momentum - 0.85 * clip(ret5 - raw_momentum / 5, lower=0)`
+   - 中期确认：风险池 `60` 日动量前 `2` 名才允许参与当天风险信号竞争
    - 对外展示和阈值判断仍使用原始 `25` 日动量
 
 2. dual momentum 仓位框架
@@ -116,7 +117,8 @@
      - `5日/20日成交额 < 90%`
      - `市场广度代理 < -4%`
      - 且综合动量 `<= 16%`
-   - 命中后，风险资产总仓位上限压到 `0%`
+   - 命中后，风险资产总仓位上限压到 `50%`
+   - 如果风险池前二名信号质量差 `<= 0.5%`，且风险仓高于 `70%`，再额外压到 `70%`
 
 4. 弱市切债 + 过热降仓
    - 若市场进入更强的弱市区间：
@@ -372,6 +374,12 @@
 
 这样做的原因是，ETF 实时价格适合盘中看信号变化，但大盘成交量盘中噪声太大，直接拿来做风控容易误判。
 
+补充：`daily_momentum_board.py` 现在也遵循同一套价格口径。
+
+- `盘中 / 午间休市`：榜单使用实时 ETF 价格计算 `25` 日动量；
+- `收盘后`：榜单回到收盘价口径；
+- 榜单消息会明确标注 `交易时段`、`价格口径`、`价格日期`，避免把盘中榜单和收盘榜单混在一起看。
+
 ## 运行环境
 
 当前项目需要区分两套运行环境：
@@ -403,11 +411,13 @@ source .venv/bin/activate
 当前 LaunchAgent 会从稳定运行版目录启动：
 
 - `com.codex.etf-momentum-monitor` -> `~/Library/Caches/wy_test_runtime/momentum_backtest/daily_monitor.py`
+- `com.codex.etf-momentum-board` -> `~/Library/Caches/wy_test_runtime/momentum_backtest/daily_momentum_board.py`
 - `com.codex.momentum-backfill` -> `~/Library/Caches/wy_test_runtime/momentum_backtest/run_backtest.py`
 
 当前调度时间是：
 
 - monitor：工作日 `09:40`、`12:10`、`14:50`
+- momentum board：工作日 `15:10`
 - backfill：工作日 `15:20`
 
 注意：LaunchAgent 当前实际调用的是系统 `/usr/bin/python3`，但它运行在稳定版目录，并以同步后的项目文件为准。

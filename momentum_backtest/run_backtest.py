@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import numpy as np
 import os
 import tempfile
 import warnings
@@ -43,7 +44,7 @@ DEFAULT_HISTORY_START = pd.Timestamp("2012-01-01")
 DEFAULT_FEE_RATE = 0.0003
 DEFAULT_SLIPPAGE_RATE = 0.0002
 DEFAULT_CASH_THRESHOLD = None
-DEFAULT_STRATEGY_NAME = "regime_mix_rm511580_rm513650_slope085_simple_ag28_co27_rm06_step_oh25_ohh30__def159985__stressbond_511260_vr90_vb-1"
+DEFAULT_STRATEGY_NAME = "baseline_cf60top2"
 DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD = 0.05
 DEFAULT_RESOURCE_ABS_THRESHOLD = 0.08
 DEFAULT_WEAK_TREND_DEFENSIVE_WEIGHT = 0.80
@@ -82,7 +83,7 @@ DEFAULT_REGIME_MIX_VOLUME_RATIO_CUT = 0.91
 DEFAULT_REGIME_MIX_VOLUME_SHORT_RATIO_CUT = 0.90
 DEFAULT_REGIME_MIX_VOLUME_BREADTH_CUT = -0.04
 DEFAULT_REGIME_MIX_PROXY_KIND = "hybrid_breadth_blend"
-DEFAULT_REGIME_MIX_VOLUME_GUARD_CAP = 0.0
+DEFAULT_REGIME_MIX_VOLUME_GUARD_CAP = 0.50
 DEFAULT_REGIME_MIX_VOLUME_GUARD_MOMENTUM_CEILING = 0.16
 DEFAULT_REGIME_MIX_OVERHEAT_DRAWDOWN_CUT = -0.02
 DEFAULT_REGIME_MIX_PRE_OVERHEAT_START_CUT = 0.15
@@ -120,34 +121,165 @@ def build_signal_quality_score(
     lookback: int,
     method: str = "raw",
     slope_penalty: float = 0.0,
+    volatility_penalty: float = 0.0,
+    downside_volatility_penalty: float = 0.0,
+    r2_penalty: float = 0.0,
+    volatility_state_lookback: int = 252,
+    volatility_percentile_penalty: float = 0.0,
+    downside_volatility_percentile_penalty: float = 0.0,
+    volatility_percentile_divisor: float = 0.0,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     raw_momentum = prices / prices.shift(lookback) - 1
-    if method == "raw":
-        return raw_momentum, raw_momentum.copy()
-    if method != "slope":
+    if method not in {"raw", "slope"}:
         raise ValueError(f"unsupported signal quality method: {method}")
 
+    quality_score = raw_momentum.copy()
     ret5 = prices / prices.shift(5) - 1
-    excess_slope = (ret5 - raw_momentum / max(lookback / 5, 1)).clip(lower=0.0)
-    quality_score = raw_momentum - slope_penalty * excess_slope
+    if method == "slope":
+        excess_slope = (ret5 - raw_momentum / max(lookback / 5, 1)).clip(lower=0.0)
+        quality_score = quality_score - slope_penalty * excess_slope
+
+    if (
+        volatility_penalty > 0
+        or downside_volatility_penalty > 0
+        or volatility_percentile_penalty > 0
+        or downside_volatility_percentile_penalty > 0
+        or volatility_percentile_divisor > 0
+    ):
+        returns = prices.pct_change()
+        total_vol20 = returns.rolling(20).std(ddof=0) * math.sqrt(252)
+        if volatility_penalty > 0:
+            quality_score = quality_score - volatility_penalty * total_vol20
+        if downside_volatility_penalty > 0:
+            downside_vol20 = returns.where(returns < 0, 0.0).rolling(20).std(ddof=0) * math.sqrt(252)
+            quality_score = quality_score - downside_volatility_penalty * downside_vol20
+
+        if volatility_percentile_penalty > 0 or volatility_percentile_divisor > 0:
+            total_vol20_pct = build_asset_relative_state_percentile(total_vol20, lookback=volatility_state_lookback)
+            if volatility_percentile_penalty > 0:
+                quality_score = quality_score - volatility_percentile_penalty * total_vol20_pct
+            if volatility_percentile_divisor > 0:
+                quality_score = quality_score / (1.0 + volatility_percentile_divisor * total_vol20_pct)
+
+        if downside_volatility_percentile_penalty > 0:
+            downside_vol20 = returns.where(returns < 0, 0.0).rolling(20).std(ddof=0) * math.sqrt(252)
+            downside_vol20_pct = build_asset_relative_state_percentile(downside_vol20, lookback=volatility_state_lookback)
+            quality_score = quality_score - downside_volatility_percentile_penalty * downside_vol20_pct
+
+    if r2_penalty > 0:
+        log_prices = np.log(prices.replace(0.0, np.nan))
+        time_index = pd.Series(np.arange(len(prices), dtype=float), index=prices.index)
+        trend_r2 = pd.DataFrame(
+            {
+                code: log_prices[code].rolling(lookback).corr(time_index).pow(2)
+                for code in prices.columns
+            },
+            index=prices.index,
+        ).clip(lower=0.0, upper=1.0)
+        quality_score = quality_score - r2_penalty * (1.0 - trend_r2)
+
     return raw_momentum, quality_score
+
+
+def build_asset_relative_state_percentile(
+    metric: pd.DataFrame,
+    lookback: int,
+    min_periods: int | None = None,
+) -> pd.DataFrame:
+    if lookback <= 1:
+        raise ValueError("lookback must be greater than 1")
+    if min_periods is None:
+        min_periods = max(20, min(lookback, lookback // 4))
+
+    def compute_last_percentile(values: np.ndarray) -> float:
+        arr = np.asarray(values, dtype=float)
+        arr = arr[~np.isnan(arr)]
+        if arr.size == 0:
+            return float("nan")
+        last = float(arr[-1])
+        less = float(np.sum(arr < last))
+        equal = float(np.sum(arr == last))
+        return (less + 0.5 * equal) / float(arr.size)
+
+    return metric.rolling(lookback, min_periods=min_periods).apply(compute_last_percentile, raw=True)
+
+
+def build_asset_relative_volatility_percentile(
+    prices: pd.DataFrame,
+    vol_window: int = 20,
+    state_lookback: int = 252,
+    downside: bool = False,
+) -> pd.DataFrame:
+    returns = prices.pct_change()
+    if downside:
+        vol = returns.where(returns < 0, 0.0).rolling(vol_window).std(ddof=0) * math.sqrt(252)
+    else:
+        vol = returns.rolling(vol_window).std(ddof=0) * math.sqrt(252)
+    return build_asset_relative_state_percentile(vol, lookback=state_lookback)
+
+
+def build_signal_stability_score(
+    prices: pd.DataFrame,
+    lookback: int,
+    method: str = "none",
+) -> pd.DataFrame | None:
+    if method == "none":
+        return None
+
+    returns = prices.pct_change()
+    if method == "total_vol":
+        return -(returns.rolling(20).std(ddof=0) * math.sqrt(252))
+    if method == "downside_vol":
+        downside_vol20 = returns.where(returns < 0, 0.0).rolling(20).std(ddof=0) * math.sqrt(252)
+        return -downside_vol20
+    if method == "r2":
+        log_prices = np.log(prices.replace(0.0, np.nan))
+        time_index = pd.Series(np.arange(len(prices), dtype=float), index=prices.index)
+        return pd.DataFrame(
+            {code: log_prices[code].rolling(lookback).corr(time_index).pow(2) for code in prices.columns},
+            index=prices.index,
+        ).clip(lower=0.0, upper=1.0)
+    raise ValueError(f"unsupported stability method: {method}")
 
 
 def choose_signal_winner_with_margin(
     score_row: pd.Series,
     prev_asset: str | None,
     leader_margin: float,
+    secondary_score_row: pd.Series | None = None,
+    secondary_score_gap: float = 0.0,
 ) -> str | None:
     valid = score_row.dropna().sort_values(ascending=False)
     if valid.empty:
         return None
     top_asset = str(valid.index[0])
     top_score = float(valid.iloc[0])
+    if secondary_score_gap > 0 and len(valid) >= 2 and float(valid.iloc[0] - valid.iloc[1]) <= secondary_score_gap:
+        second_asset = str(valid.index[1])
+        if secondary_score_row is not None:
+            secondary_valid = secondary_score_row.reindex([top_asset, second_asset]).dropna().sort_values(ascending=False)
+            if not secondary_valid.empty:
+                top_asset = str(secondary_valid.index[0])
     if leader_margin > 0 and prev_asset and prev_asset in valid.index:
         prev_score = float(valid.loc[prev_asset])
         if top_score - prev_score < leader_margin:
             return str(prev_asset)
     return top_asset
+
+
+def filter_score_row_by_confirmation(
+    score_row: pd.Series,
+    confirmation_row: pd.Series | None,
+    top_n: int,
+) -> pd.Series:
+    if confirmation_row is None or top_n <= 0:
+        return score_row
+    confirm_valid = confirmation_row.dropna().sort_values(ascending=False)
+    if confirm_valid.empty:
+        return score_row
+    allowed = set(confirm_valid.head(top_n).index)
+    filtered = score_row.where(score_row.index.isin(allowed))
+    return filtered if filtered.notna().any() else score_row
 
 
 def build_top2_close_risk_flag(
@@ -156,6 +288,15 @@ def build_top2_close_risk_flag(
     absolute_threshold: float = DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD,
     signal_quality_method: str = "raw",
     slope_penalty: float = 0.0,
+    volatility_penalty: float = 0.0,
+    downside_volatility_penalty: float = 0.0,
+    r2_penalty: float = 0.0,
+    volatility_state_lookback: int = 252,
+    volatility_percentile_penalty: float = 0.0,
+    downside_volatility_percentile_penalty: float = 0.0,
+    volatility_percentile_divisor: float = 0.0,
+    confirmation_lookback: int = 0,
+    confirmation_top_n: int = 0,
     risk_codes: list[str] | None = None,
     close_gap: float = 0.0,
 ) -> pd.Series:
@@ -167,15 +308,28 @@ def build_top2_close_risk_flag(
         lookback=lookback,
         method=signal_quality_method,
         slope_penalty=slope_penalty,
+        volatility_penalty=volatility_penalty,
+        downside_volatility_penalty=downside_volatility_penalty,
+        r2_penalty=r2_penalty,
+        volatility_state_lookback=volatility_state_lookback,
+        volatility_percentile_penalty=volatility_percentile_penalty,
+        downside_volatility_percentile_penalty=downside_volatility_percentile_penalty,
+        volatility_percentile_divisor=volatility_percentile_divisor,
     )
     active_risk_codes, _ = resolve_strategy_universe(prices, risk_codes=risk_codes, defensive_codes=[])
     if len(active_risk_codes) < 2:
         return pd.Series(False, index=prices.index, dtype=bool)
 
     risk_score = score[active_risk_codes]
+    risk_confirmation = None
+    if confirmation_lookback > 0 and confirmation_top_n > 0:
+        risk_confirmation = (prices[active_risk_codes] / prices[active_risk_codes].shift(confirmation_lookback) - 1)
     close_flag = pd.Series(False, index=prices.index, dtype=bool, name="top2_close_risk_cap_triggered")
     for dt_idx in prices.index:
-        valid = risk_score.loc[dt_idx].dropna().sort_values(ascending=False)
+        score_row = risk_score.loc[dt_idx]
+        if risk_confirmation is not None:
+            score_row = filter_score_row_by_confirmation(score_row, risk_confirmation.loc[dt_idx], confirmation_top_n)
+        valid = score_row.dropna().sort_values(ascending=False)
         if len(valid) < 2:
             continue
         top_asset = str(valid.index[0])
@@ -207,7 +361,7 @@ def load_default_strategy_backtest_pool() -> pd.DataFrame:
 def default_strategy_param_text(pool_size: int) -> str:
     return (
         f"{DEFAULT_STRATEGY_NAME}, 固定{pool_size}只ETF, k={DEFAULT_LOOKBACK}, remove={','.join(DEFAULT_BASELINE_DROP_CODES)}, "
-        f"信号口径={DEFAULT_SIGNAL_QUALITY_METHOD}{int(round(DEFAULT_SIGNAL_SLOPE_PENALTY * 100)):03d}, "
+        f"信号口径={DEFAULT_SIGNAL_QUALITY_METHOD}{int(round(DEFAULT_SIGNAL_SLOPE_PENALTY * 100)):03d}+60日前2确认, "
         f"进攻/防守核心仓={DEFAULT_REGIME_MIX_AGGRESSIVE_CORE_WEIGHT:.0%}/{DEFAULT_REGIME_MIX_CONSERVATIVE_CORE_WEIGHT:.0%}, "
         f"regime阈值={DEFAULT_REGIME_MIX_MOMENTUM_CUT:.0%}, "
         f"量能门槛=20日/60日<{DEFAULT_REGIME_MIX_VOLUME_RATIO_CUT:.0%}, 5日/20日<{DEFAULT_REGIME_MIX_VOLUME_SHORT_RATIO_CUT:.0%}, "
@@ -934,6 +1088,17 @@ def build_threshold_dual_signal(
     weak_trend_defensive_weight: float = DEFAULT_WEAK_TREND_DEFENSIVE_WEIGHT,
     signal_quality_method: str = "raw",
     slope_penalty: float = 0.0,
+    volatility_penalty: float = 0.0,
+    downside_volatility_penalty: float = 0.0,
+    r2_penalty: float = 0.0,
+    volatility_state_lookback: int = 252,
+    volatility_percentile_penalty: float = 0.0,
+    downside_volatility_percentile_penalty: float = 0.0,
+    volatility_percentile_divisor: float = 0.0,
+    confirmation_lookback: int = 0,
+    confirmation_top_n: int = 0,
+    secondary_stability_method: str = "none",
+    secondary_stability_gap: float = 0.0,
     leader_margin: float = 0.0,
     risk_codes: list[str] | None = None,
     defensive_codes: list[str] | None = None,
@@ -943,6 +1108,13 @@ def build_threshold_dual_signal(
         lookback=lookback,
         method=signal_quality_method,
         slope_penalty=slope_penalty,
+        volatility_penalty=volatility_penalty,
+        downside_volatility_penalty=downside_volatility_penalty,
+        r2_penalty=r2_penalty,
+        volatility_state_lookback=volatility_state_lookback,
+        volatility_percentile_penalty=volatility_percentile_penalty,
+        downside_volatility_percentile_penalty=downside_volatility_percentile_penalty,
+        volatility_percentile_divisor=volatility_percentile_divisor,
     )
     active_risk_codes, active_defensive_codes = resolve_strategy_universe(
         prices,
@@ -951,6 +1123,12 @@ def build_threshold_dual_signal(
     )
     risk_score = score[active_risk_codes]
     defensive_score = score[active_defensive_codes]
+    risk_confirmation = None
+    if confirmation_lookback > 0 and confirmation_top_n > 0:
+        risk_confirmation = prices[active_risk_codes] / prices[active_risk_codes].shift(confirmation_lookback) - 1
+    secondary_score = build_signal_stability_score(prices, lookback=lookback, method=secondary_stability_method)
+    risk_secondary_score = secondary_score[active_risk_codes] if secondary_score is not None else None
+    defensive_secondary_score = secondary_score[active_defensive_codes] if secondary_score is not None else None
 
     signal = pd.Series(index=prices.index, dtype="object", name="signal")
     target_exposure = pd.Series(index=prices.index, dtype="float64", name="target_exposure")
@@ -960,8 +1138,23 @@ def build_threshold_dual_signal(
     for dt_idx in prices.index:
         prev_risk = prev_signal if prev_signal in active_risk_codes else None
         prev_def = prev_signal if prev_signal in active_defensive_codes else None
-        r_asset = choose_signal_winner_with_margin(risk_score.loc[dt_idx], prev_risk, leader_margin)
-        d_asset = choose_signal_winner_with_margin(defensive_score.loc[dt_idx], prev_def, leader_margin)
+        risk_score_row = risk_score.loc[dt_idx]
+        if risk_confirmation is not None:
+            risk_score_row = filter_score_row_by_confirmation(risk_score_row, risk_confirmation.loc[dt_idx], confirmation_top_n)
+        r_asset = choose_signal_winner_with_margin(
+            risk_score_row,
+            prev_risk,
+            leader_margin,
+            None if risk_secondary_score is None else risk_secondary_score.loc[dt_idx],
+            secondary_stability_gap,
+        )
+        d_asset = choose_signal_winner_with_margin(
+            defensive_score.loc[dt_idx],
+            prev_def,
+            leader_margin,
+            None if defensive_secondary_score is None else defensive_secondary_score.loc[dt_idx],
+            secondary_stability_gap,
+        )
         r_score = float(momentum.loc[dt_idx, r_asset]) if r_asset and pd.notna(momentum.loc[dt_idx, r_asset]) else float("nan")
         d_score = float(momentum.loc[dt_idx, d_asset]) if d_asset and pd.notna(momentum.loc[dt_idx, d_asset]) else float("nan")
 
@@ -1162,7 +1355,8 @@ def build_default_strategy_params(
     risk_codes: list[str] | None = None,
     defensive_codes: list[str] | None = None,
 ) -> dict[str, object]:
-    # 极简正式版：保留 signal/regime/stress-bond 主骨架，关闭低频微调补丁层。
+    # 当前正式版：保留 signal/regime/stress-bond 主骨架，同时打开两层低副作用补丁：
+    # 1) 弱量能分档压仓；2) 前二接近去抖降仓。
     return {
         "drop_codes": list(DEFAULT_BASELINE_DROP_CODES if drop_codes is None else drop_codes),
         "risk_codes": list(RISK_CODES if risk_codes is None else risk_codes),
@@ -1170,19 +1364,41 @@ def build_default_strategy_params(
         "proxy_kind": DEFAULT_REGIME_MIX_PROXY_KIND,
         "signal_quality_method": DEFAULT_SIGNAL_QUALITY_METHOD,
         "signal_slope_penalty": DEFAULT_SIGNAL_SLOPE_PENALTY,
+        "signal_volatility_penalty": 0.0,
+        "signal_downside_volatility_penalty": 0.0,
+        "signal_r2_penalty": 0.0,
+        "signal_volatility_state_lookback": 252,
+        "signal_volatility_percentile_penalty": 0.0,
+        "signal_downside_volatility_percentile_penalty": 0.0,
+        "signal_volatility_percentile_divisor": 0.0,
+        "signal_confirmation_lookback": 60,
+        "signal_confirmation_top_n": 2,
+        "signal_secondary_stability_method": "none",
+        "signal_secondary_stability_gap": 0.0,
         "signal_leader_margin": DEFAULT_SIGNAL_LEADER_MARGIN,
-        "close_top2_gap": 0.0,
-        "close_top2_risk_cap": 1.0,
+        "close_top2_gap": DEFAULT_CLOSE_TOP2_GAP,
+        "close_top2_risk_cap": DEFAULT_CLOSE_TOP2_RISK_CAP,
         "aggressive_core_weight": DEFAULT_REGIME_MIX_AGGRESSIVE_CORE_WEIGHT,
         "conservative_core_weight": DEFAULT_REGIME_MIX_CONSERVATIVE_CORE_WEIGHT,
         "regime_momentum_cut": DEFAULT_REGIME_MIX_MOMENTUM_CUT,
         "regime_transition_mode": "step",
         "regime_transition_start_cut": 0.0,
         "regime_transition_end_cut": DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD,
+        "absolute_momentum_threshold": DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD,
+        "dynamic_threshold_mode": "fixed",
+        "dynamic_threshold_amount_20_60_cut": 1.0,
+        "dynamic_threshold_amount_5_20_cut": 1.0,
+        "dynamic_threshold_breadth_cut": 0.0,
+        "dynamic_threshold_weak_value": 0.06,
+        "dynamic_threshold_tier_step": 0.005,
+        "dynamic_threshold_max": 0.065,
+        "dynamic_threshold_strong_amount_20_60_cut": 1.05,
+        "dynamic_threshold_strong_breadth_cut": 0.02,
+        "dynamic_threshold_strong_value": 0.045,
         "volume_ratio_cut": DEFAULT_REGIME_MIX_VOLUME_RATIO_CUT,
         "volume_short_ratio_cut": DEFAULT_REGIME_MIX_VOLUME_SHORT_RATIO_CUT,
         "volume_breadth_cut": DEFAULT_REGIME_MIX_VOLUME_BREADTH_CUT,
-        "volume_guard_cap": 1.0,
+        "volume_guard_cap": DEFAULT_REGIME_MIX_VOLUME_GUARD_CAP,
         "volume_guard_momentum_ceiling": DEFAULT_REGIME_MIX_VOLUME_GUARD_MOMENTUM_CEILING,
         "overheat_drawdown_cut": DEFAULT_REGIME_MIX_OVERHEAT_DRAWDOWN_CUT,
         "pre_overheat_start_cut": DEFAULT_REGIME_MIX_PRE_OVERHEAT_START_CUT,
@@ -1193,6 +1409,12 @@ def build_default_strategy_params(
         "overheat_high_momentum_cut": DEFAULT_REGIME_MIX_OVERHEAT_HIGH_MOMENTUM_CUT,
         "overheat_high_max_exposure": DEFAULT_REGIME_MIX_OVERHEAT_HIGH_MAX_EXPOSURE,
         "overheat_cap_mode": "step",
+        "overheat_stability_method": "none",
+        "overheat_stability_min_rank": 0.0,
+        "overheat_stability_cap": 1.0,
+        "signal_selected_volatility_cap_start": 1.0,
+        "signal_selected_volatility_cap_end": 1.0,
+        "signal_selected_volatility_cap_floor": 1.0,
     }
 
 
@@ -1307,6 +1529,22 @@ def run_default_strategy_with_params(
         result["top2_close_risk_cap_triggered"] = base_result["top2_close_risk_cap_triggered"].reindex(result.index).fillna(False)
         result["top2_close_gap"] = base_result["top2_close_gap"].reindex(result.index).ffill()
         result["top2_close_risk_cap"] = base_result["top2_close_risk_cap"].reindex(result.index).ffill()
+    if "selected_volatility_rank" in base_result.columns:
+        result["selected_volatility_rank"] = base_result["selected_volatility_rank"].reindex(result.index)
+    if "absolute_momentum_threshold" in base_result.columns:
+        result["absolute_momentum_threshold"] = base_result["absolute_momentum_threshold"].reindex(result.index).ffill()
+    if "selected_volatility_cap_triggered" in base_result.columns:
+        result["selected_volatility_cap_triggered"] = base_result["selected_volatility_cap_triggered"].reindex(result.index).fillna(False)
+    if "extra_cap_triggered" in base_result.columns:
+        result["extra_cap_triggered"] = base_result["extra_cap_triggered"].reindex(result.index).fillna(False)
+    if "extra_cap_reason" in base_result.columns:
+        result["extra_cap_reason"] = base_result["extra_cap_reason"].reindex(result.index)
+    if "overheat_cap_triggered" in base_result.columns:
+        result["overheat_cap_triggered"] = base_result["overheat_cap_triggered"].reindex(result.index).fillna(False)
+    if "overheat_high_cap_triggered" in base_result.columns:
+        result["overheat_high_cap_triggered"] = base_result["overheat_high_cap_triggered"].reindex(result.index).fillna(False)
+    if "overheat_stability_cap_triggered" in base_result.columns:
+        result["overheat_stability_cap_triggered"] = base_result["overheat_stability_cap_triggered"].reindex(result.index).fillna(False)
     result["target_exposure"] = target_weights.sum(axis=1).rename("target_exposure")
     result["stress_bond_trigger"] = stress_mask
     # 保留目标组合权重，供 daily_monitor 直接展示“今日目标组合”，

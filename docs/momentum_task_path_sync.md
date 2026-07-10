@@ -37,12 +37,14 @@
 ## 迁移后待补充内容
 - 稳定运行版真实路径：`~/Library/Caches/wy_test_runtime`
 - LaunchAgent monitor 实际脚本路径：`~/Library/Caches/wy_test_runtime/momentum_backtest/daily_monitor.py`
+- LaunchAgent board 实际脚本路径：`~/Library/Caches/wy_test_runtime/momentum_backtest/daily_momentum_board.py`
 - LaunchAgent backfill 实际脚本路径：`~/Library/Caches/wy_test_runtime/momentum_backtest/run_backtest.py`
 - 若保留双目录，谁是“主编辑目录”：当前仍以 Documents 下目录作为主编辑目录；每次影响正式运行的改动，需同步到 `~/Library/Caches/wy_test_runtime` 后再重载 LaunchAgent
 
 
 ## 当前定时触发时间
 - monitor 触发时间：工作日 09:40、12:10、14:50
+- momentum board 触发时间：工作日 15:10
 - backfill 触发时间：工作日 15:20
 
-- 重载定时任务若已错过当日定时点，`scripts/sync_runtime_and_reload.sh` 会按 09:40 / 12:10 / 14:50 / 15:20 四个正式时点做一次补跑检查，并通过运行版输出文件 mtime + 当日补跑 stamp 避免重复补发。
+- 重载定时任务若已错过当日定时点，`scripts/sync_runtime_and_reload.sh` 会按 09:40 / 12:10 / 14:50 / 15:10 / 15:20 五个正式时点做一次补跑检查，并通过运行版输出文件 mtime + 当日补跑 stamp 避免重复补发。
