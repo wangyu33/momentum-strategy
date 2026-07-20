@@ -15,7 +15,10 @@ configure_matplotlib_env()
 
 import pandas as pd
 
-from compare_candidate_pool_additions import ETF_513400
+try:
+    from .candidate_pool_common import ETF_513400
+except ImportError:
+    from candidate_pool_common import ETF_513400
 from run_backtest import fetch_histories
 
 

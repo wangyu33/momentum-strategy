@@ -4,9 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+MOMENTUM_DIR = Path(__file__).resolve().parents[2]
+if str(MOMENTUM_DIR) not in sys.path:
+    sys.path.insert(0, str(MOMENTUM_DIR))
 
 try:
-    from ..runtime_env import prepare_local_imports
+    from ...runtime_env import prepare_local_imports
 except ImportError:
     from runtime_env import prepare_local_imports
 
@@ -14,23 +20,33 @@ prepare_local_imports(__file__)
 
 import pandas as pd
 
-from compare_goal_optimizations import load_market_volume_proxy
-from compare_hs300_regime_fixes import load_cached_data, summarize
-from compare_market_proxy_variants import build_risk_proxy_features
-from run_backtest import (
+from archive_data_loaders import build_archive_flat_output_dir, load_recent_selected_prices
+from variant_compare_helpers import (
+    append_variant_result,
+    build_compare_frame,
+    build_typed_summary_fields,
+    finalize_baseline_diff_summary,
+    save_plot_and_print_variant_compare_outputs,
+)
+try:
+    from ...official_baseline import apply_official_baseline_nav_anchor
+except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
+
+from goal_optimization_common import load_market_volume_proxy
+from hs300_regime_common import summarize
+from market_proxy_common import build_risk_proxy_features
+from archive_strategy_common import (
     DEFAULT_FEE_RATE,
     DEFAULT_SLIPPAGE_RATE,
     build_default_strategy_params,
-    ensure_output_dirs,
     load_default_strategy_backtest_pool,
     resolve_strategy_universe,
     run_default_strategy_with_params,
-    write_dataframe_csv_atomic,
 )
 
 
-OUTPUT_DIR = Path("momentum_backtest/output/research/archive_flat/compare_amount_proxy_blends")
-SUMMARY_PATH = OUTPUT_DIR / "summary.csv"
+OUTPUT_DIR = build_archive_flat_output_dir("compare_amount_proxy_blends")
 
 
 def parse_args() -> argparse.Namespace:
@@ -43,15 +59,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    ensure_output_dirs()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
     selected = load_default_strategy_backtest_pool()
-    _, cached_prices = load_cached_data()
-    start_ts = cached_prices.index.max() - pd.DateOffset(years=args.years)
-    prices = cached_prices.loc[cached_prices.index >= start_ts].copy()
-    selected_codes = selected["code"].astype(str).tolist()
-    prices = prices[[code for code in selected_codes if code in prices.columns]].copy()
+    prices = load_recent_selected_prices(selected, args.years)
 
     base_proxy = load_market_volume_proxy(years=args.years, refresh=False).reindex(prices.index).ffill()
     risk_codes, _ = resolve_strategy_universe(prices)
@@ -106,7 +115,7 @@ def main() -> int:
     )
 
     rows: list[dict[str, object]] = []
-    baseline_row: dict[str, float] | None = None
+    nav_compare = build_compare_frame(prices)
 
     for name, ratio_20_60, ratio_5_20, ratio_cut, short_cut in variants:
         proxy = pd.DataFrame(index=prices.index)
@@ -129,34 +138,53 @@ def main() -> int:
             slippage_rate=args.slippage_rate,
             market_proxy=proxy,
         )
+        if name == "current_a_share_amount":
+            result = apply_official_baseline_nav_anchor(result)
         summary = summarize(result, trades, selected)
-        row = {
-            "name": name,
-            "annualized_return": float(summary["annualized_return"]),
-            "sharpe_rf0": float(summary["sharpe_rf0"]),
-            "max_drawdown": float(summary["max_drawdown"]),
-            "max_drawdown_integral": float(summary["max_drawdown_integral"]),
-            "trade_action_count": int(summary["trade_action_count"]),
-            "volume_ratio_cut": ratio_cut,
-            "volume_short_ratio_cut": short_cut,
-        }
-        if baseline_row is None:
-            baseline_row = row.copy()
-            row["annualized_diff"] = 0.0
-            row["sharpe_diff"] = 0.0
-            row["max_drawdown_diff"] = 0.0
-            row["max_drawdown_integral_diff"] = 0.0
-        else:
-            row["annualized_diff"] = row["annualized_return"] - baseline_row["annualized_return"]
-            row["sharpe_diff"] = row["sharpe_rf0"] - baseline_row["sharpe_rf0"]
-            row["max_drawdown_diff"] = row["max_drawdown"] - baseline_row["max_drawdown"]
-            row["max_drawdown_integral_diff"] = row["max_drawdown_integral"] - baseline_row["max_drawdown_integral"]
-        rows.append(row)
+        append_variant_result(
+            rows,
+            nav_compare,
+            None,
+            strategy=name,
+            result=result,
+            strategy_field="name",
+            nav_column=f"{name}_nav",
+            summary=build_typed_summary_fields(
+                summary,
+                float_fields=("annualized_return", "sharpe_rf0", "max_drawdown", "max_drawdown_integral"),
+                int_fields=("trade_action_count",),
+            ),
+            extra_fields={
+                "volume_ratio_cut": ratio_cut,
+                "volume_short_ratio_cut": short_cut,
+            },
+        )
 
-    summary_df = pd.DataFrame(rows)
-    write_dataframe_csv_atomic(summary_df, SUMMARY_PATH, index=False)
-    print(summary_df.to_string(index=False))
-    print(f"\nsummary saved to {SUMMARY_PATH}")
+    summary_df = finalize_baseline_diff_summary(
+        rows,
+        baseline_field="name",
+        baseline_value="current_a_share_amount",
+        metric_mappings=(
+            ("annualized_return", "annualized_diff"),
+            ("sharpe_rf0", "sharpe_diff"),
+            ("max_drawdown", "max_drawdown_diff"),
+            ("max_drawdown_integral", "max_drawdown_integral_diff"),
+        ),
+    )
+    save_plot_and_print_variant_compare_outputs(
+        OUTPUT_DIR,
+        summary_df,
+        nav_compare,
+        plot_filename="comparison.png",
+        title="Amount Proxy Blend Comparison",
+        lines=(
+            ("current_a_share_amount_nav", "Current A Share Amount", 2.2),
+            ("blend_etf_ma20_50_nav", "Blend ETF MA20 50%", 1.8),
+            ("blend_etf_pos20_50_nav", "Blend ETF Pos20 50%", 1.8),
+            ("pure_etf_ma20_amount_nav", "Pure ETF MA20", 1.8),
+            ("pure_etf_pos20_amount_nav", "Pure ETF Pos20", 1.8),
+        ),
+    )
     return 0
 
 

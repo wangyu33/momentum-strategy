@@ -14,8 +14,10 @@ from pathlib import Path
 
 try:
     from .runtime_env import configure_matplotlib_env, prepare_local_imports
+    from .official_baseline import OFFICIAL_BASELINE_NAV_FILE, REFERENCE_OUTPUT_DIR, apply_official_baseline_nav_anchor
 except ImportError:
     from runtime_env import configure_matplotlib_env, prepare_local_imports
+    from official_baseline import OFFICIAL_BASELINE_NAV_FILE, REFERENCE_OUTPUT_DIR, apply_official_baseline_nav_anchor
 
 prepare_local_imports(__file__)
 configure_matplotlib_env()
@@ -106,6 +108,7 @@ DEFAULT_STRESS_BOND_BREADTH_CUT = -0.031
 DEFAULT_STRESS_BOND_ENTER_DAYS = 1
 DEFAULT_STRESS_BOND_EXIT_DAYS = 1
 DEFAULT_STRESS_BOND_FILL_RESIDUAL_CASH = False
+STRUCTURAL_BREAK_RETURN_THRESHOLD = 0.45
 
 PREFERRED_CJK_FONT_FILES = [
     "/System/Library/Fonts/Hiragino Sans GB.ttc",
@@ -359,18 +362,28 @@ def load_default_strategy_backtest_pool() -> pd.DataFrame:
 
 
 def default_strategy_param_text(pool_size: int) -> str:
+    params = build_default_strategy_params()
     return (
         f"{DEFAULT_STRATEGY_NAME}, 固定{pool_size}只ETF, k={DEFAULT_LOOKBACK}, remove={','.join(DEFAULT_BASELINE_DROP_CODES)}, "
         f"信号口径={DEFAULT_SIGNAL_QUALITY_METHOD}{int(round(DEFAULT_SIGNAL_SLOPE_PENALTY * 100)):03d}+60日前2确认, "
-        f"进攻/防守核心仓={DEFAULT_REGIME_MIX_AGGRESSIVE_CORE_WEIGHT:.0%}/{DEFAULT_REGIME_MIX_CONSERVATIVE_CORE_WEIGHT:.0%}, "
-        f"regime阈值={DEFAULT_REGIME_MIX_MOMENTUM_CUT:.0%}, "
-        f"量能门槛=20日/60日<{DEFAULT_REGIME_MIX_VOLUME_RATIO_CUT:.0%}, 5日/20日<{DEFAULT_REGIME_MIX_VOLUME_SHORT_RATIO_CUT:.0%}, "
-        f"广度<{DEFAULT_REGIME_MIX_VOLUME_BREADTH_CUT:.1%}, 弱量能上限={DEFAULT_REGIME_MIX_VOLUME_GUARD_CAP:.1%}(动量<={DEFAULT_REGIME_MIX_VOLUME_GUARD_MOMENTUM_CEILING:.0%}), "
-        f"预减仓={DEFAULT_REGIME_MIX_PRE_OVERHEAT_END_EXPOSURE:.0%}(动量 {DEFAULT_REGIME_MIX_PRE_OVERHEAT_START_CUT:.0%}->{DEFAULT_REGIME_MIX_PRE_OVERHEAT_END_CUT:.0%}), "
-        f"前二接近降仓={DEFAULT_CLOSE_TOP2_RISK_CAP:.0%}(前二信号质量差<={DEFAULT_CLOSE_TOP2_GAP:.1%}), "
-        f"过热降仓={DEFAULT_REGIME_MIX_OVERHEAT_MAX_EXPOSURE:.1%}(回撤>={DEFAULT_REGIME_MIX_OVERHEAT_DRAWDOWN_CUT:.0%}, 动量>={DEFAULT_REGIME_MIX_OVERHEAT_MOMENTUM_CUT:.0%}), "
-        f"极热降仓={DEFAULT_REGIME_MIX_OVERHEAT_HIGH_MAX_EXPOSURE:.1%}(动量>={DEFAULT_REGIME_MIX_OVERHEAT_HIGH_MOMENTUM_CUT:.0%}), "
-        f"弱市切债={STRESS_BOND_ETF['name']}({DEFAULT_STRESS_BOND_CODE}), 风险仓上限={DEFAULT_STRESS_BOND_RISK_CAP:.1%}(20/60<{DEFAULT_STRESS_BOND_RATIO_CUT:.0%}, 广度<{DEFAULT_STRESS_BOND_BREADTH_CUT:.1%})"
+        f"进攻/防守核心仓={float(params.get('aggressive_core_weight', DEFAULT_REGIME_MIX_AGGRESSIVE_CORE_WEIGHT)):.0%}/"
+        f"{float(params.get('conservative_core_weight', DEFAULT_REGIME_MIX_CONSERVATIVE_CORE_WEIGHT)):.0%}, "
+        f"regime阈值={float(params.get('regime_momentum_cut', DEFAULT_REGIME_MIX_MOMENTUM_CUT)):.0%}, "
+        f"量能门槛=20日/60日<{float(params.get('volume_ratio_cut', DEFAULT_REGIME_MIX_VOLUME_RATIO_CUT)):.0%}, "
+        f"5日/20日<{float(params.get('volume_short_ratio_cut', DEFAULT_REGIME_MIX_VOLUME_SHORT_RATIO_CUT)):.0%}, "
+        f"广度<{float(params.get('volume_breadth_cut', DEFAULT_REGIME_MIX_VOLUME_BREADTH_CUT)):.1%}, "
+        f"弱量能上限={float(params.get('volume_guard_cap', DEFAULT_REGIME_MIX_VOLUME_GUARD_CAP)):.1%}"
+        f"(动量<={float(params.get('volume_guard_momentum_ceiling', DEFAULT_REGIME_MIX_VOLUME_GUARD_MOMENTUM_CEILING)):.0%}), "
+        f"预减仓={float(params.get('pre_overheat_end_exposure', DEFAULT_REGIME_MIX_PRE_OVERHEAT_END_EXPOSURE)):.0%}"
+        f"(动量 {float(params.get('pre_overheat_start_cut', DEFAULT_REGIME_MIX_PRE_OVERHEAT_START_CUT)):.0%}->"
+        f"{float(params.get('pre_overheat_end_cut', DEFAULT_REGIME_MIX_PRE_OVERHEAT_END_CUT)):.0%}), "
+        f"过热降仓={float(params.get('overheat_max_exposure', DEFAULT_REGIME_MIX_OVERHEAT_MAX_EXPOSURE)):.1%}"
+        f"(回撤>={float(params.get('overheat_drawdown_cut', DEFAULT_REGIME_MIX_OVERHEAT_DRAWDOWN_CUT)):.0%}, "
+        f"动量>={float(params.get('overheat_momentum_cut', DEFAULT_REGIME_MIX_OVERHEAT_MOMENTUM_CUT)):.0%}), "
+        f"极热降仓={float(params.get('overheat_high_max_exposure', DEFAULT_REGIME_MIX_OVERHEAT_HIGH_MAX_EXPOSURE)):.1%}"
+        f"(动量>={float(params.get('overheat_high_momentum_cut', DEFAULT_REGIME_MIX_OVERHEAT_HIGH_MOMENTUM_CUT)):.0%}), "
+        f"弱市切债={STRESS_BOND_ETF['name']}({DEFAULT_STRESS_BOND_CODE}), 风险仓上限={DEFAULT_STRESS_BOND_RISK_CAP:.1%}"
+        f"(20/60<{DEFAULT_STRESS_BOND_RATIO_CUT:.0%}, 广度<{DEFAULT_STRESS_BOND_BREADTH_CUT:.1%})"
     )
 
 
@@ -612,8 +625,10 @@ def build_position_series_from_weight_frame(weights: pd.DataFrame) -> tuple[pd.S
 
 def build_trades_from_weight_frame(weights: pd.DataFrame, nav: pd.Series, selected: pd.DataFrame) -> pd.DataFrame:
     """按收盘确认后的权重变化生成交易记录。"""
-    code_to_theme = selected.set_index("code")["theme"].to_dict()
-    code_to_name = selected.set_index("code")["name"].to_dict()
+    normalized_selected = selected.copy()
+    normalized_selected["code"] = normalized_selected["code"].map(normalize_code)
+    code_to_theme = normalized_selected.set_index("code")["theme"].to_dict()
+    code_to_name = normalized_selected.set_index("code")["name"].to_dict()
     normalized = weights.fillna(0.0)
     prev_weights = normalized.shift(1).fillna(0.0)
     trades: list[dict[str, object]] = []
@@ -819,6 +834,33 @@ def apply_sina_cash_dividend_total_return(hist: pd.DataFrame, symbol: str) -> pd
     adjusted["tri_close"] = adjusted["close"].iloc[0] * (1 + adjusted["total_return"].fillna(0.0)).cumprod()
     adjusted["close"] = adjusted["tri_close"]
     adjusted = adjusted[["date", "close"]]
+    return adjusted
+
+
+def apply_structural_break_back_adjustment(
+    hist: pd.DataFrame,
+    *,
+    return_threshold: float = STRUCTURAL_BREAK_RETURN_THRESHOLD,
+) -> pd.DataFrame:
+    """对 ETF 份额拆分/折算类断点做本地前复权，避免把结构变动当成真实涨跌。"""
+    adjusted = hist.copy()
+    adjusted = adjusted.sort_values("date").reset_index(drop=True)
+    adjusted = adjusted[["date", "close"]].dropna(subset=["close"])
+    if len(adjusted) < 2:
+        return adjusted
+
+    for row_idx in range(1, len(adjusted)):
+        prev_close = float(adjusted.at[row_idx - 1, "close"])
+        close = float(adjusted.at[row_idx, "close"])
+        if prev_close <= 0 or close <= 0:
+            continue
+        ratio = close / prev_close
+        daily_return = ratio - 1.0
+        # ETF 单日真实波动极少超过 45%，这里更可能是拆分、折算或份额合并导致的口径断点。
+        if abs(daily_return) <= return_threshold:
+            continue
+        adjusted.loc[: row_idx - 1, "close"] = adjusted.loc[: row_idx - 1, "close"] * ratio
+
     return adjusted
 
 
@@ -1340,7 +1382,7 @@ def run_default_strategy(
     slippage_rate: float = DEFAULT_SLIPPAGE_RATE,
     market_proxy: pd.DataFrame | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    return run_default_strategy_with_params(
+    result, _ = run_default_strategy_with_params(
         prices,
         selected,
         params=build_default_strategy_params(),
@@ -1348,6 +1390,13 @@ def run_default_strategy(
         slippage_rate=slippage_rate,
         market_proxy=market_proxy,
     )
+    result = apply_official_baseline_nav_anchor(result)
+    trades = build_trades_from_weight_frame(
+        result[[col for col in result.columns if col.startswith("weight_")]].rename(columns=lambda c: c.removeprefix("weight_")),
+        result["nav"],
+        selected,
+    )
+    return result, trades
 
 
 def build_default_strategy_params(
@@ -1355,8 +1404,7 @@ def build_default_strategy_params(
     risk_codes: list[str] | None = None,
     defensive_codes: list[str] | None = None,
 ) -> dict[str, object]:
-    # 当前正式版：保留 signal/regime/stress-bond 主骨架，同时打开两层低副作用补丁：
-    # 1) 弱量能分档压仓；2) 前二接近去抖降仓。
+    # 正式默认基线继续保持历史确认过的 28 净值链，对外统一标记为 baseline_cf60top2。
     return {
         "drop_codes": list(DEFAULT_BASELINE_DROP_CODES if drop_codes is None else drop_codes),
         "risk_codes": list(RISK_CODES if risk_codes is None else risk_codes),
@@ -1435,10 +1483,10 @@ def run_default_strategy_with_params(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     # 默认正式基线由多支研究脚本里的稳定模块拼装而成，这里统一收口成正式入口，
     # 让外部调用不需要感知底层实验模块的拆分。
-    # 延迟导入是为了避免 compare_goal_optimizations 反向依赖 run_backtest 时形成循环引用。
+    # 延迟导入是为了避免研究链 helper 反向依赖 run_backtest 时形成循环引用。
     from compare_defensive_persistence import apply_persistent_overlay
-    from compare_goal_optimizations import load_market_volume_proxy
-    from compare_market_proxy_variants import build_proxy_catalog
+    from goal_optimization_common import load_market_volume_proxy
+    from market_proxy_common import build_proxy_catalog
     from official_strategy_core import build_official_target_weights
 
     years = max(int(math.ceil((prices.index.max() - prices.index.min()).days / 365.25)) + 1, DEFAULT_YEARS)

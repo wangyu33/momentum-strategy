@@ -7,8 +7,6 @@ import json
 import os
 import subprocess
 import time
-import urllib.error
-import urllib.request
 import uuid
 from pathlib import Path
 from typing import Callable
@@ -230,26 +228,49 @@ def build_webhook_url(args) -> str:
     return args.webhook_url or os.getenv("DAILY_MONITOR_WEBHOOK_URL", DEFAULT_FEISHU_WEBHOOK)
 
 
+def _send_webhook_payload_via_curl(payload: dict[str, object], webhook_url: str) -> str:
+    payload_text = json.dumps(payload, ensure_ascii=False)
+    cmd = [
+        "curl",
+        "-sS",
+        "-X",
+        "POST",
+        webhook_url,
+        "-H",
+        "Content-Type: application/json; charset=utf-8",
+        "--data-binary",
+        payload_text,
+        "--connect-timeout",
+        "10",
+        "--max-time",
+        "30",
+        "-w",
+        "\n%{http_code}",
+    ]
+    result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or f"curl exit {result.returncode}"
+        raise RuntimeError(f"webhook send failed: {detail}")
+
+    body, _, status_text = result.stdout.rpartition("\n")
+    if not status_text.isdigit():
+        raise RuntimeError(f"webhook send failed: invalid curl response {result.stdout!r}")
+
+    status_code = int(status_text)
+    if status_code >= 400:
+        raise RuntimeError(f"webhook send failed: HTTP {status_code} {body.strip()}")
+    return body
+
+
 def _send_webhook_payload(payload: dict[str, object], webhook_url: str, log_fn: Callable[[str], None] | None = None) -> None:
     # 兼容本地测试与离线占位值：若 webhook 不是完整 URL，则视作 no-op 成功发送。
     if not str(webhook_url).startswith(("http://", "https://")):
         return
-    payload_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     last_error: RuntimeError | None = None
     for attempt in range(1, WEBHOOK_MAX_RETRIES + 1):
-        request = urllib.request.Request(
-            webhook_url,
-            data=payload_bytes,
-            headers={"Content-Type": "application/json; charset=utf-8"},
-            method="POST",
-        )
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
-                body = response.read().decode("utf-8", errors="replace")
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")
-            last_error = RuntimeError(f"webhook send failed: HTTP {exc.code} {detail}")
-        except urllib.error.URLError as exc:
+            body = _send_webhook_payload_via_curl(payload, webhook_url)
+        except Exception as exc:
             last_error = RuntimeError(f"webhook send failed: {exc}")
         else:
             try:

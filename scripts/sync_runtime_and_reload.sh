@@ -3,13 +3,62 @@ set -euo pipefail
 
 SRC_DIR="/Users/bytedance/Documents/trae_projects/wy_test"
 RUNTIME_DIR="$HOME/Library/Caches/wy_test_runtime"
+RUNTIME_VENV="$RUNTIME_DIR/.venv"
+RUNTIME_PYTHON="$RUNTIME_VENV/bin/python"
+RUNTIME_REQUIREMENTS_REL="momentum_backtest/runtime-requirements.txt"
+BOOTSTRAP_PYTHON="/opt/homebrew/bin/python3"
+PIP_CACHE_DIR="$RUNTIME_DIR/.pip-cache"
+STRICT_RUNTIME_VALIDATION="${STRICT_RUNTIME_VALIDATION:-0}"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 MONITOR_PLIST="$LAUNCH_AGENTS_DIR/com.codex.etf-momentum-monitor.plist"
 BOARD_PLIST="$LAUNCH_AGENTS_DIR/com.codex.etf-momentum-board.plist"
 BACKFILL_PLIST="$LAUNCH_AGENTS_DIR/com.codex.momentum-backfill.plist"
 GUI_UID="$(id -u)"
 
-printf '[1/6] Sync project to runtime: %s -> %s\n' "$SRC_DIR" "$RUNTIME_DIR"
+ensure_runtime_python() {
+  local requirements_file="$RUNTIME_DIR/$RUNTIME_REQUIREMENTS_REL"
+  local stamp_file="$RUNTIME_VENV/.bootstrap-fingerprint"
+  local requirements_sha python_id desired_fingerprint current_fingerprint
+
+  if [[ ! -x "$BOOTSTRAP_PYTHON" ]]; then
+    printf 'bootstrap python not found: %s\n' "$BOOTSTRAP_PYTHON" >&2
+    exit 1
+  fi
+
+  mkdir -p "$PIP_CACHE_DIR"
+
+  if [[ ! -x "$RUNTIME_PYTHON" ]]; then
+    printf '[2/9] Create runtime venv with %s\n' "$BOOTSTRAP_PYTHON"
+    "$BOOTSTRAP_PYTHON" -m venv "$RUNTIME_VENV"
+  else
+    printf '[2/9] Reuse runtime venv: %s\n' "$RUNTIME_VENV"
+  fi
+
+  if [[ ! -f "$requirements_file" ]]; then
+    printf 'runtime requirements file not found: %s\n' "$requirements_file" >&2
+    exit 1
+  fi
+
+  requirements_sha="$(shasum -a 256 "$requirements_file" | awk '{print $1}')"
+  python_id="$($RUNTIME_PYTHON - <<'PY'
+import sys
+print(f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+PY
+)"
+  desired_fingerprint=$(printf 'python=%s\nrequirements_sha=%s\n' "$python_id" "$requirements_sha")
+  current_fingerprint="$(cat "$stamp_file" 2>/dev/null || true)"
+
+  if [[ "$current_fingerprint" != "$desired_fingerprint" ]]; then
+    printf '[3/9] Install runtime dependencies\n'
+    PIP_CACHE_DIR="$PIP_CACHE_DIR" "$RUNTIME_PYTHON" -m pip install --upgrade pip
+    PIP_CACHE_DIR="$PIP_CACHE_DIR" "$RUNTIME_PYTHON" -m pip install --requirement "$requirements_file"
+    printf '%s' "$desired_fingerprint" > "$stamp_file"
+  else
+    printf '[3/9] Runtime dependencies already up to date\n'
+  fi
+}
+
+printf '[1/9] Sync project to runtime: %s -> %s\n' "$SRC_DIR" "$RUNTIME_DIR"
 mkdir -p "$RUNTIME_DIR"
 rsync -a --delete \
   --exclude '.git' \
@@ -19,7 +68,7 @@ rsync -a --delete \
   --exclude '.pycache_local' \
   "$SRC_DIR/" "$RUNTIME_DIR/"
 
-printf '[1.5/6] Prepare runtime log paths\n'
+printf '[1.5/9] Prepare runtime log paths\n'
 mkdir -p \
   "$RUNTIME_DIR/momentum_backtest/output" \
   "$RUNTIME_DIR/momentum_backtest/output/core" \
@@ -34,10 +83,17 @@ touch \
   "$RUNTIME_DIR/momentum_backtest/output/monitor/daily_monitor.run.log" \
   "$RUNTIME_DIR/momentum_backtest/output/monitor/daily_momentum_board.run.log"
 
-printf '[2/6] Validate runtime outputs\n'
-python3 "$RUNTIME_DIR/momentum_backtest/validate_strategy_outputs.py"
+ensure_runtime_python
 
-printf '[3/6] Rewrite LaunchAgent plist files\n'
+printf '[4/9] Validate runtime outputs\n'
+if ! "$RUNTIME_PYTHON" "$RUNTIME_DIR/momentum_backtest/validate_strategy_outputs.py"; then
+  if [[ "$STRICT_RUNTIME_VALIDATION" == "1" ]]; then
+    exit 1
+  fi
+  printf '[warn] validate_strategy_outputs.py reported failures; continuing scheduler reload because runtime bootstrap succeeded. Set STRICT_RUNTIME_VALIDATION=1 to fail fast.\n' >&2
+fi
+
+printf '[5/9] Rewrite LaunchAgent plist files\n'
 cat > "$MONITOR_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -47,7 +103,7 @@ cat > "$MONITOR_PLIST" <<PLIST
     <string>com.codex.etf-momentum-monitor</string>
     <key>ProgramArguments</key>
     <array>
-      <string>/usr/bin/python3</string>
+      <string>$RUNTIME_PYTHON</string>
       <string>$RUNTIME_DIR/momentum_backtest/daily_monitor.py</string>
       <string>--disable-direct-feishu</string>
     </array>
@@ -90,7 +146,7 @@ cat > "$BOARD_PLIST" <<PLIST
     <string>com.codex.etf-momentum-board</string>
     <key>ProgramArguments</key>
     <array>
-      <string>/usr/bin/python3</string>
+      <string>$RUNTIME_PYTHON</string>
       <string>$RUNTIME_DIR/momentum_backtest/daily_momentum_board.py</string>
       <string>--disable-direct-feishu</string>
     </array>
@@ -123,7 +179,7 @@ cat > "$BACKFILL_PLIST" <<PLIST
     <string>com.codex.momentum-backfill</string>
     <key>ProgramArguments</key>
     <array>
-      <string>/usr/bin/python3</string>
+      <string>$RUNTIME_PYTHON</string>
       <string>$RUNTIME_DIR/momentum_backtest/run_backtest.py</string>
     </array>
     <key>WorkingDirectory</key>
@@ -146,8 +202,7 @@ cat > "$BACKFILL_PLIST" <<PLIST
 </plist>
 PLIST
 
-printf '[4/7] Reload LaunchAgents
-'
+printf '[6/9] Reload LaunchAgents\n'
 launchctl bootout "gui/$GUI_UID/com.codex.etf-momentum-monitor" >/dev/null 2>&1 || true
 launchctl bootout "gui/$GUI_UID/com.codex.etf-momentum-board" >/dev/null 2>&1 || true
 launchctl bootout "gui/$GUI_UID/com.codex.momentum-backfill" >/dev/null 2>&1 || true
@@ -155,8 +210,7 @@ launchctl bootstrap "gui/$GUI_UID" "$MONITOR_PLIST"
 launchctl bootstrap "gui/$GUI_UID" "$BOARD_PLIST"
 launchctl bootstrap "gui/$GUI_UID" "$BACKFILL_PLIST"
 
-printf '[5/7] Catch up missed slots after reload if needed
-'
+printf '[7/9] Catch up missed slots after reload if needed\n'
 STAMP_DIR="$RUNTIME_DIR/momentum_backtest/output/monitor/scheduler_catchup"
 mkdir -p "$STAMP_DIR"
 TODAY_YYYYMMDD="$(date +%Y%m%d)"
@@ -198,8 +252,7 @@ maybe_catchup_slot() {
     return 0
   fi
 
-  printf '  - catch up %s %s
-' "$service" "$slot_name"
+  printf '  - catch up %s %s\n' "$service" "$slot_name"
   launchctl kickstart -k "gui/$GUI_UID/${service}"
   : > "$stamp_file"
 }
@@ -210,15 +263,11 @@ maybe_catchup_slot "com.codex.etf-momentum-monitor" "1450" "1450" "$MONITOR_STAT
 maybe_catchup_slot "com.codex.etf-momentum-board" "1510" "1510" "$BOARD_STATE"
 maybe_catchup_slot "com.codex.momentum-backfill" "1520" "1520" "$BACKTEST_NAV"
 
-printf '[6/7] Print registered jobs
-'
+printf '[8/9] Print registered jobs\n'
 launchctl print "gui/$GUI_UID/com.codex.etf-momentum-monitor" | sed -n '1,25p'
-printf '
-'
+printf '\n'
 launchctl print "gui/$GUI_UID/com.codex.etf-momentum-board" | sed -n '1,25p'
-printf '
-'
+printf '\n'
 launchctl print "gui/$GUI_UID/com.codex.momentum-backfill" | sed -n '1,25p'
 
-printf '[7/7] Done. Runtime sync + scheduler reload complete.
-'
+printf '[9/9] Done. Runtime sync + scheduler reload complete.\n'

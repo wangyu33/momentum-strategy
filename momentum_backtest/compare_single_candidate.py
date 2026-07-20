@@ -10,19 +10,34 @@ try:
 except ImportError:
     from runtime_env import configure_matplotlib_env, prepare_local_imports
 
+try:
+    from .official_baseline import apply_official_baseline_nav_anchor
+except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
+
 prepare_local_imports(__file__)
 configure_matplotlib_env()
 
 import pandas as pd
 
-from compare_candidate_pool_additions import (
-    BASE_DEFENSIVE_CODES,
-    BASE_RISK_CODES,
-    ETF_164824,
-    ETF_513400,
-    run_custom_threshold_dual_with_overheat,
-    summarize,
-)
+try:
+    from .candidate_pool_common import (
+        BASE_DEFENSIVE_CODES,
+        BASE_RISK_CODES,
+        ETF_164824,
+        ETF_513400,
+        run_custom_threshold_dual_with_overheat,
+        summarize,
+    )
+except ImportError:
+    from candidate_pool_common import (
+        BASE_DEFENSIVE_CODES,
+        BASE_RISK_CODES,
+        ETF_164824,
+        ETF_513400,
+        run_custom_threshold_dual_with_overheat,
+        summarize,
+    )
 from run_backtest import fetch_histories, load_fixed_etf_pool
 
 
@@ -56,6 +71,8 @@ def run_case(name: str, selected: pd.DataFrame, risk_codes: list[str], defensive
         fee_rate=args.fee_rate,
         slippage_rate=args.slippage_rate,
     )
+    if name == "base_pool":
+        result = apply_official_baseline_nav_anchor(result)
     summary = summarize(result, trades)
     summary["pool"] = name
     summary["latest_holding"] = result["holding"].iloc[-1]

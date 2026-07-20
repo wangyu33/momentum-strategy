@@ -15,34 +15,60 @@ configure_matplotlib_env()
 
 import pandas as pd
 
-from compare_candidate_pool_additions import (
-    ETF_164824,
-    ETF_510050,
-    ETF_510230,
-    ETF_510500,
-    ETF_510880,
-    ETF_510900,
-    ETF_511090,
-    ETF_511260,
-    ETF_511380,
-    ETF_512100,
-    ETF_512480,
-    ETF_513030,
-    ETF_513080,
-    ETF_513180,
-    ETF_513400,
-    ETF_515790,
-    ETF_588000,
-)
-from compare_current_best_pool_additions import (
-    ETF_159930,
-    ETF_159985,
-    ETF_508000,
-    ETF_510410,
-    ETF_513300,
-    ETF_513660,
-    ETF_515220,
-)
+try:
+    from .candidate_pool_common import (
+        ETF_159930,
+        ETF_159985,
+        ETF_164824,
+        ETF_508000,
+        ETF_510050,
+        ETF_510230,
+        ETF_510410,
+        ETF_510500,
+        ETF_510880,
+        ETF_510900,
+        ETF_511090,
+        ETF_511260,
+        ETF_511380,
+        ETF_512100,
+        ETF_512480,
+        ETF_513030,
+        ETF_513080,
+        ETF_513180,
+        ETF_513300,
+        ETF_513400,
+        ETF_513660,
+        ETF_515220,
+        ETF_515790,
+        ETF_588000,
+    )
+except ImportError:
+    from candidate_pool_common import (
+        ETF_159930,
+        ETF_159985,
+        ETF_164824,
+        ETF_508000,
+        ETF_510050,
+        ETF_510230,
+        ETF_510410,
+        ETF_510500,
+        ETF_510880,
+        ETF_510900,
+        ETF_511090,
+        ETF_511260,
+        ETF_511380,
+        ETF_512100,
+        ETF_512480,
+        ETF_513030,
+        ETF_513080,
+        ETF_513180,
+        ETF_513300,
+        ETF_513400,
+        ETF_513660,
+        ETF_515220,
+        ETF_515790,
+        ETF_588000,
+    )
 from run_backtest import fetch_histories
 
 

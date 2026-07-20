@@ -15,10 +15,10 @@ prepare_local_imports(__file__)
 import pandas as pd
 
 try:
-    from .compare_candidate_pool_additions import ETF_511260
-    from .compare_goal_optimizations import DEFAULT_FEISHU_WEBHOOK, METRIC_TOLERANCE, send_improvement_notification
-    from .compare_hs300_regime_fixes import load_cached_data, run_target_weights_strategy, summarize
-    from .compare_market_proxy_variants import build_proxy_catalog
+    from .candidate_pool_common import ETF_511260
+    from .goal_optimization_common import DEFAULT_FEISHU_WEBHOOK, METRIC_TOLERANCE, load_market_volume_proxy, send_improvement_notification
+    from .hs300_regime_common import load_cached_data, run_target_weights_strategy, summarize
+    from .market_proxy_common import build_proxy_catalog
     from .official_strategy_core import build_official_target_weights
     from .compare_tail_risk_bond_overlay import load_market_proxy_best_context
     from .search_utils import (
@@ -31,10 +31,10 @@ try:
         write_json_atomic,
     )
 except ImportError:
-    from compare_candidate_pool_additions import ETF_511260
-    from compare_goal_optimizations import DEFAULT_FEISHU_WEBHOOK, METRIC_TOLERANCE, send_improvement_notification
-    from compare_hs300_regime_fixes import load_cached_data, run_target_weights_strategy, summarize
-    from compare_market_proxy_variants import build_proxy_catalog
+    from candidate_pool_common import ETF_511260
+    from goal_optimization_common import DEFAULT_FEISHU_WEBHOOK, METRIC_TOLERANCE, load_market_volume_proxy, send_improvement_notification
+    from hs300_regime_common import load_cached_data, run_target_weights_strategy, summarize
+    from market_proxy_common import build_proxy_catalog
     from official_strategy_core import build_official_target_weights
     from compare_tail_risk_bond_overlay import load_market_proxy_best_context
     from search_utils import (
@@ -226,8 +226,6 @@ def main() -> int:
         prices = prices[[code for code in selected_for_prices["code"].astype(str) if code in prices.columns]].copy()
     if str(ETF_511260["code"]) not in prices.columns:
         raise RuntimeError(f"missing required baseline treasury history: {ETF_511260['code']} {ETF_511260['name']}")
-
-    from compare_goal_optimizations import load_market_volume_proxy
 
     base_market_proxy = load_market_volume_proxy(years=args.years, refresh=args.refresh)
     proxy_catalog = {

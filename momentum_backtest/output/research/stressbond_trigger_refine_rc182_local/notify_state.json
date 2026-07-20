@@ -1,0 +1,27 @@
+{
+  "strategy": "regime_mix_rm511580_rm513650_volume_guard_ag28_co27_vr91_vs90_vb01_vg30_cap08_hi04_dd02_rm06_vm16_oh25_ohh32__proxy_hybrid_breadth_blend_vr91_vs90_vb-1__edge_rc180_vg283_oc066_oh030__stressbond_511260_vr90_vb-1",
+  "summary": {
+    "total_return": 18.455163912554585,
+    "annualized_return": 0.23628552582781878,
+    "annualized_volatility": 0.201539131781738,
+    "sharpe_rf0": 1.1724279866104674,
+    "max_drawdown": -0.21652249079407723,
+    "max_drawdown_integral": 36.88477849808087,
+    "trade_count": 1569,
+    "avg_exposure": 0.8126635400407182,
+    "latest_holding_code": "159941",
+    "latest_holding_theme": "纳指ETF",
+    "latest_holding_name": "纳指ETF广发",
+    "latest_momentum": 0.11705237513046077,
+    "latest_exposure": 1.0,
+    "ratio_cut": 0.9,
+    "breadth_cut": -0.031,
+    "risk_cap": 0.18,
+    "annualized_diff": 0.0011289572225423347,
+    "sharpe_diff": 0.005461231679352379,
+    "max_drawdown_integral_diff": -0.005151525326758278,
+    "drawdown_integral_definition": "full_history",
+    "drawdown_integral_recomputed": false
+  },
+  "description": "弱市切债保持 20/60 量能<90%，将广度阈值从 -3.0% 收紧到 -3.1%，同时把风险仓上限从 18.2% 下调到 18.0%。"
+}

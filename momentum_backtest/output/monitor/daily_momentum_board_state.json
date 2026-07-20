@@ -1,0 +1,14 @@
+{
+  "strategy_label": "candidate_momentum_board_default",
+  "trade_date": "2026-07-06",
+  "latest_price_date": "2026-07-06",
+  "market_session_label": "午间休市",
+  "price_mode_label": "盘中实时价",
+  "_message": "ETF候选池动量榜 2026-07-06\n交易时段: 午间休市 / 价格口径: 盘中实时价\n价格日期: 2026-07-06 / 排序: 25日动量降序\n排名  标的                     25日\n-----------------------------------\n 1  513880 日经ETF         5.55%\n 2  159985 豆粕            0.91%\n 3  511260 十年国债ETF    -0.01%\n 4  510300 沪深300        -0.67%\n 5  159949 创业板50       -3.21%\n 6  159941 纳指ETF        -4.78%\n 7  512890 红利低波ETF    -5.66%\n 8  159954 H股            -6.35%\n 9  518880 黄金ETF        -7.79%",
+  "_delivery_progress_schema": "v2",
+  "_delivery_progress": [
+    {
+      "webhook": true
+    }
+  ]
+}

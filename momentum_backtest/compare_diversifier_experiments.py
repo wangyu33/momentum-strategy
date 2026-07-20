@@ -7,35 +7,35 @@ import argparse
 
 try:
     from .runtime_env import prepare_local_imports
+    from .official_baseline import apply_official_baseline_nav_anchor
 except ImportError:
     from runtime_env import prepare_local_imports
+    from official_baseline import apply_official_baseline_nav_anchor
 
 prepare_local_imports(__file__, include_module_dir=False)
 
 import pandas as pd
 
 try:
-    from .compare_hs300_regime_fixes import summarize
-    from .compare_current_best_pool_additions import (
+    from .candidate_pool_common import (
         ETF_159930,
         ETF_159985,
         ETF_510410,
         ETF_515220,
-        apply_pool_change,
-        evaluate_pool,
     )
-    from .compare_goal_optimizations import load_market_volume_proxy
+    from .hs300_regime_common import summarize
+    from .goal_optimization_common import load_market_volume_proxy
+    from .pool_change_common import apply_pool_change, evaluate_pool
 except ImportError:
-    from compare_hs300_regime_fixes import summarize
-    from compare_current_best_pool_additions import (
+    from candidate_pool_common import (
         ETF_159930,
         ETF_159985,
         ETF_510410,
         ETF_515220,
-        apply_pool_change,
-        evaluate_pool,
     )
-    from compare_goal_optimizations import load_market_volume_proxy
+    from hs300_regime_common import summarize
+    from goal_optimization_common import load_market_volume_proxy
+    from pool_change_common import apply_pool_change, evaluate_pool
 
 from run_backtest import (
     DEFAULT_BASELINE_DROP_CODES,
@@ -109,7 +109,10 @@ def main() -> int:
             defensive_codes=defensive_codes,
             fee_rate=args.fee_rate,
             slippage_rate=args.slippage_rate,
+            use_official_baseline_anchor=(str(change["pool"]) == "base_pool"),
         )
+        if str(change["pool"]) == "base_pool":
+            result = apply_official_baseline_nav_anchor(result)
         row = summarize(result, trades, selected)
         row["pool"] = str(change["pool"])
         row["change_kind"] = str(change["kind"])

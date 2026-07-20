@@ -1,0 +1,211 @@
+[2026-06-08 15:30:04] [daily_monitor] start strategy=default, force=False, debug=False, disable_direct_feishu=False
+[2026-06-08 15:30:04] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-06-08 15:31:08] [daily_monitor] snapshot ready: trade_date=2026-06-08, session=收盘后, holding=513880, desired=513880, exposure=1.0
+[2026-06-08 15:31:08] [daily_monitor] skip duplicate state: strategy=regime_mix_rm511580_rm513650_slope085_volume_guard_ag28_co27_vr91_vs90_vb01_vg30_cap08_hi04_dd02_rm06_vm16_m15_20_c90_oh25_ohh30_cont_f30_l10_t2g05_t2r70__proxy_hybrid_breadth_blend_vr91_vs90_vb-2__edge_rc000_vg000_pc900_oc300_oh100__def159985__stressbond_511260_vr90_vb-1, trade_date=2026-06-08, holding=513880, exposure=1.0
+[2026-06-12 11:40:45] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=False, disable_direct_feishu=False
+[2026-06-12 11:40:45] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-06-12 11:41:35] [daily_monitor] snapshot ready: trade_date=2026-06-12, session=午间休市, holding=512890, desired=513880, exposure=0.8
+[2026-06-12 11:41:35] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-06-12 11:41:35] [daily_monitor] delivery start message 1/2 pending=direct,webhook
+[2026-06-12 11:41:37] [daily_monitor] direct feishu sent message 1/2
+[2026-06-12 11:41:39] [daily_monitor] webhook sent message 1/2
+[2026-06-12 11:41:40] [daily_monitor] delivery start message 2/2 pending=direct,webhook
+[2026-06-12 11:41:41] [daily_monitor] direct feishu sent message 2/2
+[2026-06-12 11:41:42] [daily_monitor] webhook sent message 2/2
+[2026-06-12 11:41:42] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-06-12 11:41:42] [daily_monitor] state saved to momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-06-12 17:50:25] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-06-12 17:50:25] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-06-12 17:51:42] [daily_monitor] snapshot ready: trade_date=2026-06-12, session=收盘后, holding=513880, desired=513880, exposure=1.0
+[2026-06-12 17:51:42] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-06-12 17:51:42] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-06-12 17:52:06] [daily_monitor] webhook sent message 1/2
+[2026-06-12 17:52:07] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-06-12 17:52:08] [daily_monitor] webhook sent message 2/2
+[2026-06-12 17:52:08] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-06-12 17:52:08] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-06-17 17:21:10] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-06-17 17:21:11] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-06-17 17:22:05] [daily_monitor] snapshot ready: trade_date=2026-06-17, session=收盘后, holding=513880, desired=513880, exposure=1.0
+[2026-06-17 17:22:05] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-06-17 17:22:05] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-06-17 17:22:06] [daily_monitor] webhook sent message 1/2
+[2026-06-17 17:22:07] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-06-17 17:22:08] [daily_monitor] webhook sent message 2/2
+[2026-06-17 17:22:08] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-06-17 17:22:08] [daily_monitor] state saved to momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-06-22 19:50:17] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=False
+[2026-06-22 19:50:17] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-06-22 19:51:38] [daily_monitor] snapshot ready: trade_date=2026-06-22, session=收盘后, holding=513880, desired=513880, exposure=1.0
+[2026-06-22 19:51:38] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-06-22 19:51:38] [daily_monitor] delivery start message 1/2 pending=direct,webhook
+[2026-06-22 19:51:40] [daily_monitor] direct feishu sent message 1/2
+[2026-06-22 19:51:41] [daily_monitor] webhook sent message 1/2
+[2026-06-22 19:51:42] [daily_monitor] delivery start message 2/2 pending=direct,webhook
+[2026-06-22 19:51:43] [daily_monitor] direct feishu sent message 2/2
+[2026-06-22 19:51:44] [daily_monitor] webhook sent message 2/2
+[2026-06-22 19:51:44] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-06-22 19:51:44] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-06-23 14:08:32] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=False
+[2026-06-23 14:08:32] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-06-23 14:09:16] [daily_monitor] snapshot ready: trade_date=2026-06-23, session=盘中, holding=513880, desired=513880, exposure=1.0
+[2026-06-23 14:09:16] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-06-23 14:09:16] [daily_monitor] delivery start message 1/2 pending=direct,webhook
+[2026-06-23 14:09:18] [daily_monitor] direct feishu sent message 1/2
+[2026-06-23 14:09:19] [daily_monitor] webhook sent message 1/2
+[2026-06-23 14:09:20] [daily_monitor] delivery start message 2/2 pending=direct,webhook
+[2026-06-23 14:09:22] [daily_monitor] direct feishu sent message 2/2
+[2026-06-23 14:09:23] [daily_monitor] webhook sent message 2/2
+[2026-06-23 14:09:23] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-06-23 14:09:23] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-06-30 15:21:31] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=True, disable_direct_feishu=True
+[2026-06-30 15:21:32] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-06-30 15:22:42] [daily_monitor] snapshot ready: trade_date=2026-06-30, session=收盘后, holding=513880, desired=513880, exposure=1.0
+[2026-06-30 15:22:42] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-06-30 15:22:42] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-06-30 15:22:43] [daily_monitor] webhook sent message 1/2
+[2026-06-30 15:22:44] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-06-30 15:22:45] [daily_monitor] webhook sent message 2/2
+[2026-06-30 15:22:45] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-06-30 15:22:45] [daily_monitor] state saved to momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-02 15:34:05] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=False
+[2026-07-02 15:34:05] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-02 15:34:56] [daily_monitor] snapshot ready: trade_date=2026-07-02, session=收盘后, holding=513880, desired=513880, exposure=1.0
+[2026-07-02 15:34:56] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-07-02 15:34:56] [daily_monitor] delivery start message 1/2 pending=direct,webhook
+[2026-07-02 15:34:58] [daily_monitor] direct feishu sent message 1/2
+[2026-07-02 15:34:58] [daily_monitor] webhook sent message 1/2
+[2026-07-02 15:34:59] [daily_monitor] delivery start message 2/2 pending=direct,webhook
+[2026-07-02 15:35:00] [daily_monitor] direct feishu sent message 2/2
+[2026-07-02 15:35:00] [daily_monitor] webhook sent message 2/2
+[2026-07-02 15:35:00] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-02 15:35:00] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-07-02 15:38:49] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-07-02 15:38:49] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-02 15:39:10] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-07-02 15:39:10] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-02 15:39:42] [daily_monitor] snapshot ready: trade_date=2026-07-02, session=收盘后, holding=513880, desired=513880, exposure=1.0
+[2026-07-02 15:39:42] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-07-02 15:39:42] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-07-02 15:39:42] [daily_monitor] webhook sent message 1/2
+[2026-07-02 15:39:44] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-07-02 15:39:44] [daily_monitor] webhook sent message 2/2
+[2026-07-02 15:39:44] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-02 15:39:44] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-07-02 15:40:05] [daily_monitor] snapshot ready: trade_date=2026-07-02, session=收盘后, holding=513880, desired=513880, exposure=1.0
+[2026-07-02 15:40:05] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-07-02 15:40:05] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-07-02 15:40:05] [daily_monitor] webhook sent message 1/2
+[2026-07-02 15:40:06] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-07-02 15:40:06] [daily_monitor] webhook sent message 2/2
+[2026-07-02 15:40:06] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-02 15:40:06] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-07-02 15:40:51] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-07-02 15:40:51] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-02 15:41:44] [daily_monitor] snapshot ready: trade_date=2026-07-02, session=收盘后, holding=513880, desired=513880, exposure=1.0
+[2026-07-02 15:41:44] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-07-02 15:41:44] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-07-02 15:41:44] [daily_monitor] webhook sent message 1/2
+[2026-07-02 15:41:46] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-07-02 15:41:46] [daily_monitor] webhook sent message 2/2
+[2026-07-02 15:41:46] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-02 15:41:46] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-07-02 15:53:27] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=False
+[2026-07-02 15:53:27] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-02 15:54:16] [daily_monitor] snapshot ready: trade_date=2026-07-02, session=收盘后, holding=513880, desired=513880, exposure=1.0
+[2026-07-02 15:54:16] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-07-02 15:54:16] [daily_monitor] delivery start message 1/2 pending=direct,webhook
+[2026-07-02 15:54:18] [daily_monitor] direct feishu sent message 1/2
+[2026-07-02 15:54:19] [daily_monitor] webhook sent message 1/2
+[2026-07-02 15:54:20] [daily_monitor] delivery start message 2/2 pending=direct,webhook
+[2026-07-02 15:54:21] [daily_monitor] direct feishu sent message 2/2
+[2026-07-02 15:54:22] [daily_monitor] webhook sent message 2/2
+[2026-07-02 15:54:22] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-02 15:54:22] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-07-02 15:57:52] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-07-02 15:57:52] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-02 15:58:47] [daily_monitor] snapshot ready: trade_date=2026-07-02, session=收盘后, holding=513880, desired=513880, exposure=1.0
+[2026-07-02 15:58:47] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-07-02 15:58:47] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-07-02 15:58:48] [daily_monitor] webhook sent message 1/2
+[2026-07-02 15:58:49] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-07-02 15:58:50] [daily_monitor] webhook sent message 2/2
+[2026-07-02 15:58:50] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-02 15:58:50] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-07-06 11:51:25] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-07-06 11:51:25] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-06 11:52:09] [daily_monitor] snapshot ready: trade_date=2026-07-06, session=午间休市, holding=513880, desired=513880, exposure=1.0, slot=0940
+[2026-07-06 11:52:09] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-07-06 11:52:09] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-07-06 11:52:11] [daily_monitor] webhook sent message 1/2
+[2026-07-06 11:52:12] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-07-06 11:52:13] [daily_monitor] webhook sent message 2/2
+[2026-07-06 11:52:13] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-06 11:52:13] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-07-07 16:43:28] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-07-07 16:43:28] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-07 16:44:41] [daily_monitor] snapshot ready: trade_date=2026-07-07, session=收盘后, holding=159985, desired=159985, exposure=0.8, slot=1450
+[2026-07-07 16:44:41] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-07-07 16:44:41] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-07-07 16:44:42] [daily_monitor] webhook sent message 1/2
+[2026-07-07 16:44:44] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-07-07 16:44:45] [daily_monitor] webhook sent message 2/2
+[2026-07-07 16:44:45] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-07 16:44:45] [daily_monitor] state saved to momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-07 16:45:17] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-07-07 16:45:17] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-07 16:46:16] [daily_monitor] snapshot ready: trade_date=2026-07-07, session=收盘后, holding=159985, desired=159985, exposure=0.8, slot=1450
+[2026-07-07 16:46:16] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-07-07 16:46:16] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-07-07 16:46:17] [daily_monitor] webhook sent message 1/2
+[2026-07-10 15:36:37] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-07-10 15:36:37] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-10 15:37:43] [daily_monitor] snapshot ready: trade_date=2026-07-10, session=收盘后, holding=159985, desired=159985, exposure=1.0, slot=1450
+[2026-07-10 15:37:43] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-07-10 15:37:43] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-07-10 15:37:44] [daily_monitor] webhook sent message 1/2
+[2026-07-10 15:37:46] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-07-10 15:37:47] [daily_monitor] webhook sent message 2/2
+[2026-07-10 15:37:47] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-10 15:37:47] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-07-16 12:09:18] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-07-16 12:09:18] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-16 12:10:09] [daily_monitor] snapshot ready: trade_date=2026-07-16, session=午间休市, holding=159985, desired=159985, exposure=0.8, slot=0940
+[2026-07-16 12:10:09] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-07-16 12:10:09] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-07-16 12:10:11] [daily_monitor] webhook sent message 1/2
+[2026-07-16 12:10:12] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-07-16 12:10:13] [daily_monitor] webhook sent message 2/2
+[2026-07-16 12:10:13] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-16 12:10:13] [daily_monitor] state saved to momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-16 13:14:16] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-07-16 13:14:16] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-16 13:14:51] [daily_monitor] snapshot ready: trade_date=2026-07-16, session=盘中, holding=159985, desired=159985, exposure=0.8, slot=1210
+[2026-07-16 13:14:51] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-07-16 13:14:51] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-07-16 13:14:52] [daily_monitor] webhook sent message 1/2
+[2026-07-16 13:14:53] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-07-16 13:14:54] [daily_monitor] webhook sent message 2/2
+[2026-07-16 13:14:54] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-16 13:14:54] [daily_monitor] state saved to momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-16 13:21:20] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-07-16 13:21:20] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-16 13:21:56] [daily_monitor] snapshot ready: trade_date=2026-07-16, session=盘中, holding=159985, desired=159985, exposure=0.8, slot=1210
+[2026-07-16 13:21:56] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-07-16 13:21:56] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-07-16 13:21:57] [daily_monitor] webhook sent message 1/2
+[2026-07-16 13:21:59] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-07-16 13:21:59] [daily_monitor] webhook sent message 2/2
+[2026-07-16 13:21:59] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-16 13:21:59] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-07-16 15:28:55] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-07-16 15:28:55] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-07-16 15:30:04] [daily_monitor] snapshot ready: trade_date=2026-07-16, session=收盘后, holding=159985, desired=159985, exposure=0.8, slot=1450
+[2026-07-16 15:30:04] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-07-16 15:30:04] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-07-16 15:30:05] [daily_monitor] webhook sent message 1/2
+[2026-07-16 15:30:07] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-07-16 15:30:09] [daily_monitor] webhook retry 1/3 after throttling or transient failure
+[2026-07-16 15:30:12] [daily_monitor] webhook sent message 2/2
+[2026-07-16 15:30:12] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-07-16 15:30:12] [daily_monitor] preview_send mode complete: state file left unchanged

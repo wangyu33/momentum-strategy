@@ -292,6 +292,9 @@ def build_position_and_trade_context(
         extra_cap_triggered = bool(result.loc[latest_idx, "extra_cap_triggered"])
     elif extra_cap_reason is not None:
         extra_cap_triggered = True
+    elif base_exposure is not None and desired_exposure is not None and base_exposure - desired_exposure > 1e-12:
+        # 兼容旧基线：历史结果未单独落 extra_cap 字段时，仍可从“基础目标仓位 > 当前目标仓位”推断发生了附加压仓。
+        extra_cap_triggered = True
 
     trade_rows = pd.DataFrame()
     confirmed_trade_date = None

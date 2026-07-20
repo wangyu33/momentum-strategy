@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
-"""Compare China Internet variants using resource_abs08 as the baseline."""
+"""Compare China Internet variants using resource_abs08 as the baseline.
+
+This script intentionally preserves the historical resource_abs08 research baseline and
+must not be anchored to the official 28.2691 formal baseline chain.
+"""
 
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+MOMENTUM_DIR = Path(__file__).resolve().parents[2]
+if str(MOMENTUM_DIR) not in sys.path:
+    sys.path.insert(0, str(MOMENTUM_DIR))
 
 try:
-    from ..runtime_env import configure_matplotlib_env, prepare_local_imports
+    from ...runtime_env import configure_matplotlib_env, prepare_local_imports
 except ImportError:
     from runtime_env import configure_matplotlib_env, prepare_local_imports
 
@@ -16,10 +26,18 @@ configure_matplotlib_env()
 import matplotlib
 import pandas as pd
 
-from compare_candidate_pool_additions import BASE_DEFENSIVE_CODES, BASE_RISK_CODES, ETF_513050
-from compare_resource_guards import RESOURCE_CODE
-from compare_strategy_refinements import run_signal_strategy
-from run_backtest import (
+from archive_data_loaders import build_archive_flat_output_dir, load_workspace_selected_prices
+from candidate_pool_common import BASE_DEFENSIVE_CODES, BASE_RISK_CODES, ETF_513050
+from dual_momentum_helpers import summarize_variant_result as summarize_exposure_variant_result
+from resource_guard_common import RESOURCE_CODE
+from strategy_signal_common import run_signal_strategy
+from variant_compare_helpers import (
+    append_variant_result,
+    ensure_compare_frame,
+    finalize_baseline_diff_summary,
+    save_plot_and_print_variant_compare_outputs,
+)
+from archive_strategy_common import (
     DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD,
     DEFAULT_FEE_RATE,
     DEFAULT_OVERHEAT_DRAWDOWN_CUT,
@@ -30,21 +48,17 @@ from run_backtest import (
     DEFAULT_SLIPPAGE_RATE,
     DEFAULT_WEAK_TREND_DEFENSIVE_WEIGHT,
     RESEARCH_OUTPUT_DIR,
-    annualized_return,
-    build_benchmark_nav,
-    ensure_output_dirs,
     fetch_histories,
     load_fixed_etf_pool,
-    max_drawdown,
-    save_figure_atomic,
-    write_dataframe_csv_atomic,
 )
 
 matplotlib.use("Agg")
-from matplotlib import pyplot as plt
 
 CHINA_INTERNET_CODE = "513050"
-OUTPUT_DIR = RESEARCH_OUTPUT_DIR / "archive_flat" / "compare_resource_baseline_with_china_internet"
+OUTPUT_DIR = build_archive_flat_output_dir("compare_resource_baseline_with_china_internet")
+RESOURCE_ABS08_OUTPUT_DIR = RESEARCH_OUTPUT_DIR / "resource_abs08"
+CHINA_INTERNET_CAP70_OUTPUT_DIR = RESEARCH_OUTPUT_DIR / "china_internet_cap70"
+INTENTIONALLY_UNANCHORED_BASELINE = True
 
 
 def parse_args() -> argparse.Namespace:
@@ -53,31 +67,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lookback", type=int, default=25, help="Momentum lookback window.")
     parser.add_argument("--fee-rate", type=float, default=DEFAULT_FEE_RATE, help="Single-side fee rate.")
     parser.add_argument("--slippage-rate", type=float, default=DEFAULT_SLIPPAGE_RATE, help="Single-side slippage rate.")
+    parser.add_argument("--refresh", action="store_true", help="重新抓取历史数据，而不是优先复用本地 research/cache 价格。")
     return parser.parse_args()
 
 
-def summarize(result: pd.DataFrame, trades: pd.DataFrame) -> dict[str, float | int | str]:
-    daily_ret = result["strategy_return"].fillna(0.0)
-    ann_ret = annualized_return(result["nav"])
-    ann_vol = float(daily_ret.std(ddof=0) * (252 ** 0.5))
-    sharpe = ann_ret / ann_vol if ann_vol > 0 else float("nan")
-    ci_share = float((result["holding"] == CHINA_INTERNET_CODE).fillna(False).mean())
-    resource_share = float((result["holding"] == RESOURCE_CODE).fillna(False).mean())
-    return {
-        "start_date": result.index[0].date().isoformat(),
-        "end_date": result.index[-1].date().isoformat(),
-        "total_return": float(result["nav"].iloc[-1] - 1),
-        "annualized_return": ann_ret,
-        "annualized_volatility": ann_vol,
-        "sharpe_rf0": sharpe,
-        "max_drawdown": max_drawdown(result["nav"]),
-        "trade_count": int(len(trades)),
-        "avg_exposure": float(result["exposure"].mean()),
-        "china_internet_holding_share": ci_share,
-        "resource_holding_share": resource_share,
-        "latest_momentum": float(result["current_momentum"].dropna().iloc[-1]),
-        "latest_exposure": float(result["exposure"].iloc[-1]),
-    }
+def load_resource_abs08_selected() -> pd.DataFrame:
+    """优先复用历史 resource_abs08 的候选池，确保比较口径不漂移。"""
+    selected_path = RESOURCE_ABS08_OUTPUT_DIR / "selected_etfs.csv"
+    if selected_path.exists():
+        return pd.read_csv(selected_path, dtype={"code": str})
+    return pd.concat([load_fixed_etf_pool(), pd.DataFrame([ETF_513050])], ignore_index=True)
+
+
+def load_prices(selected: pd.DataFrame, *, years: int, refresh: bool) -> pd.DataFrame:
+    prices = load_workspace_selected_prices(
+        selected,
+        years=years,
+        refresh=refresh,
+        fetch_fn=fetch_histories,
+        missing_label="required resource/china histories",
+    )
+    return prices.dropna(how="any")
 
 
 def choose_signal(
@@ -175,9 +185,12 @@ def run_variant(
 
 def main() -> int:
     args = parse_args()
-    base_pool = load_fixed_etf_pool()
-    selected = pd.concat([base_pool, pd.DataFrame([ETF_513050])], ignore_index=True)
-    prices = fetch_histories(selected, years=args.years).dropna(how="any")
+    base_pool = load_resource_abs08_selected()
+    if CHINA_INTERNET_CODE not in base_pool["code"].astype(str).tolist():
+        selected = pd.concat([base_pool, pd.DataFrame([ETF_513050])], ignore_index=True)
+    else:
+        selected = base_pool.copy()
+    prices = load_prices(selected, years=args.years, refresh=args.refresh)
 
     resource_risk_codes = BASE_RISK_CODES + [RESOURCE_CODE]
     resource_ci_risk_codes = BASE_RISK_CODES + [RESOURCE_CODE, CHINA_INTERNET_CODE]
@@ -191,7 +204,6 @@ def main() -> int:
 
     rows: list[dict[str, object]] = []
     compare_df = None
-    base_metrics: dict[str, float | int] = {}
     for name, risk_codes, china_mode in variants:
         result, trades = run_variant(
             prices=prices,
@@ -202,53 +214,55 @@ def main() -> int:
             risk_codes=risk_codes,
             china_mode=china_mode,
         )
-        row = {"variant": name, **summarize(result, trades)}
-        rows.append(row)
-        if compare_df is None:
-            compare_df = pd.DataFrame(index=result.index)
-            compare_df["hs300_benchmark"] = build_benchmark_nav(prices, benchmark_code="510300")
-        compare_df[name] = result["nav"].reindex(compare_df.index)
-        if name == "resource_abs08_baseline":
-            base_metrics = {
-                "total_return": float(row["total_return"]),
-                "annualized_return": float(row["annualized_return"]),
-                "sharpe_rf0": float(row["sharpe_rf0"]),
-                "max_drawdown": float(row["max_drawdown"]),
-                "trade_count": int(row["trade_count"]),
-            }
+        row = summarize_exposure_variant_result(
+            result,
+            trades,
+            selected,
+            include_window_dates=True,
+            extra_fields={
+                "china_internet_holding_share": float((result["holding"] == CHINA_INTERNET_CODE).fillna(False).mean()),
+                "resource_holding_share": float((result["holding"] == RESOURCE_CODE).fillna(False).mean()),
+            },
+        )
+        compare_df = ensure_compare_frame(compare_df, prices, index=result.index)
+        append_variant_result(
+            rows,
+            compare_df,
+            None,
+            strategy=name,
+            result=result,
+            summary=row,
+            strategy_field="variant",
+            nav_column=name,
+        )
+    summary = finalize_baseline_diff_summary(
+        rows,
+        baseline_field="variant",
+        baseline_value="resource_abs08_baseline",
+        metric_mappings=(
+            ("total_return", "return_diff"),
+            ("annualized_return", "annualized_diff"),
+            ("sharpe_rf0", "sharpe_diff"),
+            ("max_drawdown", "mdd_diff"),
+            ("trade_count", "trade_diff"),
+        ),
+    )
 
-    summary = pd.DataFrame(rows)
-    summary["return_diff"] = summary["total_return"] - float(base_metrics["total_return"])
-    summary["annualized_diff"] = summary["annualized_return"] - float(base_metrics["annualized_return"])
-    summary["sharpe_diff"] = summary["sharpe_rf0"] - float(base_metrics["sharpe_rf0"])
-    summary["mdd_diff"] = summary["max_drawdown"] - float(base_metrics["max_drawdown"])
-    summary["trade_diff"] = summary["trade_count"] - int(base_metrics["trade_count"])
-
-    ensure_output_dirs()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    write_dataframe_csv_atomic(summary, OUTPUT_DIR / "summary.csv", index=False)
-    write_dataframe_csv_atomic(compare_df, OUTPUT_DIR / "nav_compare.csv")
-
-    plt.style.use("seaborn-v0_8-whitegrid")
-    fig, ax = plt.subplots(figsize=(14, 7))
-    for column in [
-        "resource_abs08_baseline",
-        "resource_abs08_plus_ci",
-        "resource_abs08_plus_ci_cap70",
-        "resource_abs08_ci_exclude_to_second",
-        "resource_abs08_ci_reverse_to_defensive",
-    ]:
-        ax.plot(compare_df.index, compare_df[column], linewidth=2.0 if column == "resource_abs08_baseline" else 1.8, label=column)
-    ax.plot(compare_df.index, compare_df["hs300_benchmark"], linewidth=1.5, linestyle="--", label="HS300 ETF")
-    ax.set_title("Resource Abs08 Baseline vs China Internet Variants", loc="left", fontsize=16, fontweight="bold")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Net Value")
-    ax.legend()
-    fig.tight_layout()
-    save_figure_atomic(fig, OUTPUT_DIR / "comparison.png", dpi=180, bbox_inches="tight")
-    plt.close(fig)
-
-    print(summary.to_csv(index=False))
+    save_plot_and_print_variant_compare_outputs(
+        OUTPUT_DIR,
+        summary,
+        compare_df,
+        plot_filename="comparison.png",
+        title="Resource Abs08 Baseline vs China Internet Variants",
+        lines=(
+            ("resource_abs08_baseline", "resource_abs08_baseline", 2.0),
+            ("resource_abs08_plus_ci", "resource_abs08_plus_ci", 1.8),
+            ("resource_abs08_plus_ci_cap70", "resource_abs08_plus_ci_cap70", 1.8),
+            ("resource_abs08_ci_exclude_to_second", "resource_abs08_ci_exclude_to_second", 1.8),
+            ("resource_abs08_ci_reverse_to_defensive", "resource_abs08_ci_reverse_to_defensive", 1.8),
+        ),
+        benchmark_label="HS300 ETF",
+    )
     return 0
 
 

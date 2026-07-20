@@ -6,8 +6,9 @@ from __future__ import annotations
 import pandas as pd
 
 try:
-    from .compare_market_proxy_variants import build_proxy_catalog
-    from .compare_hs300_regime_fixes import run_target_weights_strategy
+    from .market_proxy_common import build_proxy_catalog
+    from .hs300_regime_common import run_target_weights_strategy
+    from .official_baseline import apply_official_baseline_nav_anchor
     from .run_backtest import (
         build_default_strategy_params,
         build_strategy_summary,
@@ -15,8 +16,9 @@ try:
         run_default_strategy_with_params,
     )
 except ImportError:
-    from compare_market_proxy_variants import build_proxy_catalog
-    from compare_hs300_regime_fixes import run_target_weights_strategy
+    from market_proxy_common import build_proxy_catalog
+    from hs300_regime_common import run_target_weights_strategy
+    from official_baseline import apply_official_baseline_nav_anchor
     from run_backtest import (
         build_default_strategy_params,
         build_strategy_summary,
@@ -42,6 +44,7 @@ def load_official_research_context() -> dict[str, object]:
         params=params,
         market_proxy=effective_proxy,
     )
+    official_result = apply_official_baseline_nav_anchor(official_result)
     return {
         "selected": selected,
         "prices": prices,
@@ -53,12 +56,14 @@ def load_official_research_context() -> dict[str, object]:
     }
 
 
-def extract_target_weights(result: pd.DataFrame) -> pd.DataFrame:
+def extract_target_weights(result: pd.DataFrame, *, prices: pd.DataFrame | None = None) -> pd.DataFrame:
     cols = [c for c in result.columns if c.startswith("target_weight_")]
     if not cols:
         raise RuntimeError("missing target_weight_ columns")
     target = result[cols].copy()
     target.columns = [c.removeprefix("target_weight_") for c in cols]
+    if prices is not None:
+        target = target.reindex(index=prices.index, columns=prices.columns, fill_value=0.0).fillna(0.0)
     return target
 
 

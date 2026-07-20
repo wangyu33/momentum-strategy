@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
-"""Scan pool additions/removals/replacements on top of the current notified regime-mix strategy."""
+"""Scan pool additions/removals/replacements on top of the current notified regime-mix strategy.
+
+This script intentionally keeps its own historical regime-mix baseline and must not be
+anchored to the official 28.2691 formal baseline chain.
+"""
 
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
+MOMENTUM_DIR = Path(__file__).resolve().parents[2]
+if str(MOMENTUM_DIR) not in sys.path:
+    sys.path.insert(0, str(MOMENTUM_DIR))
+
 try:
-    from ..runtime_env import configure_matplotlib_env, prepare_local_imports
+    from ...runtime_env import configure_matplotlib_env, prepare_local_imports
 except ImportError:
     from runtime_env import configure_matplotlib_env, prepare_local_imports
 
@@ -17,39 +26,43 @@ configure_matplotlib_env()
 import matplotlib
 import pandas as pd
 
-from compare_candidate_pool_additions import (
+from archive_data_loaders import build_archive_flat_output_dir, load_workspace_selected_prices
+from candidate_pool_common import (
     ETF_510230,
     ETF_510500,
     ETF_510880,
     ETF_510900,
-    ETF_511090,
-    ETF_511260,
     ETF_511380,
     ETF_512100,
     ETF_513030,
     ETF_513050,
     ETF_588000,
 )
-from compare_hs300_regime_fixes import load_cached_data, run_target_weights_strategy, summarize
-from run_backtest import (
+from hs300_regime_common import load_cached_data, run_target_weights_strategy, summarize
+from overlay_candidate_catalog import TREASURY_10Y, TREASURY_30Y
+from overlay_strategy_helpers import apply_risk_cap
+from variant_compare_helpers import (
+    append_variant_result,
+    build_compare_frame,
+    finalize_baseline_diff_summary,
+    save_plot_and_print_variant_compare_outputs,
+)
+from archive_strategy_common import (
     DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD,
     DEFAULT_FEE_RATE,
     DEFAULT_OVERHEAT_DRAWDOWN_CUT,
     DEFAULT_OVERHEAT_MOMENTUM_CUT,
     DEFAULT_SLIPPAGE_RATE,
     DEFAULT_WEAK_TREND_DEFENSIVE_WEIGHT,
-    ensure_output_dirs,
     fetch_histories,
     load_fixed_etf_pool,
-    save_figure_atomic,
-    write_dataframe_csv_atomic,
 )
 
 matplotlib.use("Agg")
-from matplotlib import pyplot as plt
 
 
-OUTPUT_DIR = Path("momentum_backtest/output/research/archive_flat/compare_regime_mix_pool_variations")
+OUTPUT_DIR = build_archive_flat_output_dir("compare_regime_mix_pool_variations")
+INTENTIONALLY_UNANCHORED_BASELINE = True
 BASE_RISK_CODES = ["510300", "159949", "159954", "159941", "513650", "513880"]
 BASE_DEFENSIVE_CODES = ["511580", "518880", "512890"]
 NOTIFIED_OVERHEAT_CAP = 0.30
@@ -63,8 +76,8 @@ ADDITION_CANDIDATES = [
     ("risk", ETF_512100),
     ("risk", ETF_510900),
     ("risk", ETF_510230),
-    ("defensive", ETF_511090),
-    ("defensive", ETF_511260),
+    ("defensive", TREASURY_30Y),
+    ("defensive", TREASURY_10Y),
     ("defensive", ETF_511380),
     ("defensive", ETF_510880),
 ]
@@ -225,26 +238,23 @@ def run_custom_regime_mix_strategy(
         & (base_result["drawdown"] >= DEFAULT_OVERHEAT_DRAWDOWN_CUT)
         & (mixed_momentum >= DEFAULT_OVERHEAT_MOMENTUM_CUT)
     )
-    capped_target_weights = mixed_target_weights.copy()
-    if reduce_mask.any():
-        scale = pd.Series(1.0, index=prices.index, dtype="float64")
-        scale.loc[reduce_mask] = overheat_cap / row_risk_weight.loc[reduce_mask]
-        capped_target_weights.loc[reduce_mask, risk_codes] = capped_target_weights.loc[reduce_mask, risk_codes].mul(
-            scale.loc[reduce_mask], axis=0
-        )
+    capped_target_weights = apply_risk_cap(
+        mixed_target_weights,
+        risk_budget_codes=risk_codes,
+        trigger_mask=reduce_mask,
+        risk_cap=overheat_cap,
+    )
     high_reduce_mask = (
         (capped_target_weights[risk_codes].sum(axis=1) > overheat_high_cap)
         & (base_result["drawdown"] >= DEFAULT_OVERHEAT_DRAWDOWN_CUT)
         & (mixed_momentum >= overheat_high_momentum)
     )
-    if high_reduce_mask.any():
-        high_scale = pd.Series(1.0, index=prices.index, dtype="float64")
-        high_scale.loc[high_reduce_mask] = (
-            overheat_high_cap / capped_target_weights[risk_codes].sum(axis=1).loc[high_reduce_mask]
-        )
-        capped_target_weights.loc[high_reduce_mask, risk_codes] = capped_target_weights.loc[
-            high_reduce_mask, risk_codes
-        ].mul(high_scale.loc[high_reduce_mask], axis=0)
+    capped_target_weights = apply_risk_cap(
+        capped_target_weights,
+        risk_budget_codes=risk_codes,
+        trigger_mask=high_reduce_mask,
+        risk_cap=overheat_high_cap,
+    )
     return run_target_weights_strategy(
         prices,
         selected,
@@ -327,30 +337,70 @@ def build_variants(refresh: bool) -> list[dict[str, object]]:
     return variants
 
 
+def load_base_prices(*, years: int, start_date: str, refresh: bool) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """优先按本脚本固定池加载价格；formal core 缓存缺列时自动补抓。"""
+    base_selected = load_fixed_etf_pool()
+    _, core_cached_prices = load_cached_data()
+    extra_paths = [Path("momentum_backtest/output/core/prices.csv")] if not core_cached_prices.empty else None
+    prices = load_workspace_selected_prices(
+        base_selected,
+        years=years if refresh else None,
+        start_date=pd.Timestamp(start_date),
+        refresh=refresh,
+        fetch_fn=fetch_histories,
+        extra_paths=extra_paths,
+        missing_label="required regime-mix histories",
+    )
+    prices = prices.dropna(how="all")
+    return base_selected, prices
+
+
+def load_refresh_price_panel(*, years: int, start_date: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """refresh 模式下一次性抓全候选池，避免每个变体重复拉历史。"""
+    base_selected = load_fixed_etf_pool()
+    extra_selected = pd.DataFrame([item for _, item in ADDITION_CANDIDATES])
+    combined_selected = pd.concat([base_selected, extra_selected], ignore_index=True)
+    combined_selected = combined_selected.drop_duplicates(subset="code", keep="first").reset_index(drop=True)
+    prices = fetch_histories(combined_selected, years=years)
+    prices = prices.loc[prices.index >= pd.Timestamp(start_date)].copy()
+    prices = prices.dropna(how="all")
+    return combined_selected, prices
+
+
 def main() -> int:
     args = parse_args()
-    ensure_output_dirs()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    base_selected, base_prices = load_cached_data()
-    base_prices = base_prices.loc[base_prices.index >= pd.Timestamp(args.start_date)].copy()
+    refresh_selected: pd.DataFrame | None = None
+    refresh_prices: pd.DataFrame | None = None
+    if args.refresh:
+        refresh_selected, refresh_prices = load_refresh_price_panel(years=args.years, start_date=args.start_date)
+        base_selected = load_fixed_etf_pool()
+        base_codes = [code for code in base_selected["code"].astype(str) if code in refresh_prices.columns]
+        base_prices = refresh_prices[base_codes].copy()
+    else:
+        base_selected, base_prices = load_base_prices(
+            years=args.years,
+            start_date=args.start_date,
+            refresh=False,
+        )
     variants = build_variants(refresh=args.refresh)
 
     rows: list[dict[str, object]] = []
-    compare_df = pd.DataFrame(index=base_prices.index)
+    compare_df = build_compare_frame(base_prices)
     variant_count = 0
     base_summary: dict[str, float | int | str] | None = None
 
     for variant in variants:
         selected = pd.DataFrame(variant["selected"]).copy()
-        uses_only_base = set(selected["code"]).issubset(set(base_selected["code"]))
-        if uses_only_base:
-            prices = base_prices[[code for code in selected["code"] if code in base_prices.columns]].copy()
+        selected_codes = selected["code"].astype(str).tolist()
+        uses_only_base = set(selected_codes).issubset(set(base_selected["code"].astype(str)))
+        if args.refresh:
+            assert refresh_prices is not None
+            prices = refresh_prices[[code for code in selected_codes if code in refresh_prices.columns]].copy()
+        elif uses_only_base:
+            prices = base_prices[[code for code in selected_codes if code in base_prices.columns]].copy()
         else:
-            if not args.refresh:
-                continue
-            prices = fetch_histories(selected, years=args.years)
-            prices = prices.loc[prices.index >= pd.Timestamp(args.start_date)].copy()
+            continue
         if prices.empty or "510300" not in prices.columns:
             continue
         prices = prices.loc[prices.index >= pd.Timestamp(args.start_date)].copy()
@@ -367,14 +417,23 @@ def main() -> int:
             fee_rate=args.fee_rate,
             slippage_rate=args.slippage_rate,
         )
-        compare_df[variant["name"]] = result["nav"].reindex(compare_df.index)
         summary = summarize(result, trades, selected)
-        summary["variant"] = variant["name"]
-        summary["start_date"] = str(result.index.min().date())
-        summary["end_date"] = str(result.index.max().date())
-        summary["risk_codes"] = ",".join([code for code in variant["risk_codes"] if code in prices.columns])
-        summary["defensive_codes"] = ",".join([code for code in variant["defensive_codes"] if code in prices.columns])
-        rows.append(summary)
+        summary = append_variant_result(
+            rows,
+            compare_df,
+            None,
+            strategy=str(variant["name"]),
+            result=result,
+            summary=summary,
+            strategy_field="variant",
+            nav_column=str(variant["name"]),
+            extra_fields={
+                "start_date": str(result.index.min().date()),
+                "end_date": str(result.index.max().date()),
+                "risk_codes": ",".join([code for code in variant["risk_codes"] if code in prices.columns]),
+                "defensive_codes": ",".join([code for code in variant["defensive_codes"] if code in prices.columns]),
+            },
+        )
         variant_count += 1
         if variant["name"] == "base_regime_mix":
             base_summary = summary
@@ -382,32 +441,35 @@ def main() -> int:
     if not rows or base_summary is None:
         raise RuntimeError("no valid pool variants were evaluated")
 
-    summary_df = pd.DataFrame(rows)
-    summary_df["annualized_diff"] = summary_df["annualized_return"] - float(base_summary["annualized_return"])
-    summary_df["sharpe_diff"] = summary_df["sharpe_rf0"] - float(base_summary["sharpe_rf0"])
-    summary_df["mdd_diff"] = summary_df["max_drawdown"] - float(base_summary["max_drawdown"])
-    summary_df["trade_diff"] = summary_df["trade_count"] - int(base_summary["trade_count"])
-    summary_df = summary_df.sort_values(["annualized_return", "sharpe_rf0", "max_drawdown"], ascending=[False, False, False])
-    write_dataframe_csv_atomic(summary_df, OUTPUT_DIR / "summary.csv", index=False)
-    write_dataframe_csv_atomic(compare_df, OUTPUT_DIR / "nav_compare.csv")
-
-    plt.style.use("seaborn-v0_8-whitegrid")
-    fig, ax = plt.subplots(figsize=(14, 7))
+    summary_df = finalize_baseline_diff_summary(
+        rows,
+        baseline_field="variant",
+        baseline_value="base_regime_mix",
+        metric_mappings=(
+            ("annualized_return", "annualized_diff"),
+            ("sharpe_rf0", "sharpe_diff"),
+            ("max_drawdown", "mdd_diff"),
+            ("trade_count", "trade_diff"),
+        ),
+        sort_by=["annualized_return", "sharpe_rf0", "max_drawdown"],
+        ascending=[False, False, False],
+    )
     focus = ["base_regime_mix"] + summary_df["variant"].head(6).tolist()
     focus = list(dict.fromkeys(focus))
-    for name in focus:
-        if name not in compare_df.columns:
-            continue
-        ax.plot(compare_df.index, compare_df[name], linewidth=2.1 if name == "base_regime_mix" else 1.7, label=name)
-    ax.set_title(f"Regime Mix Pool Variations ({variant_count} variants)", loc="left", fontsize=16, fontweight="bold")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Net Value")
-    ax.legend()
-    fig.tight_layout()
-    save_figure_atomic(fig, OUTPUT_DIR / "top_variants.png", dpi=180, bbox_inches="tight")
-    plt.close(fig)
-
-    print(summary_df.to_csv(index=False))
+    save_plot_and_print_variant_compare_outputs(
+        OUTPUT_DIR,
+        summary_df,
+        compare_df,
+        plot_filename="top_variants.png",
+        title=f"Regime Mix Pool Variations ({variant_count} variants)",
+        lines=[
+            (name, name, 2.1 if name == "base_regime_mix" else 1.7)
+            for name in focus
+            if name in compare_df.columns
+        ],
+        benchmark_label="HS300",
+        benchmark_column="hs300_benchmark",
+    )
     return 0
 
 

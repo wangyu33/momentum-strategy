@@ -10,6 +10,7 @@ import sys
 import tempfile
 import importlib
 import subprocess
+import argparse
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ prepare_local_imports(__file__, include_module_dir=False)
 
 import pandas as pd
 try:
+    from .official_baseline import apply_official_baseline_nav_anchor
     from .compare_china_internet_guards import CHINA_INTERNET_CODE, summarize as summarize_china_internet_guard
     from .compare_current_best_fine_tune import normalize_params as normalize_fine_tune_params
     from .compare_defensive_persistence import apply_persistent_overlay
@@ -61,6 +63,7 @@ try:
     )
     from . import monitor_delivery as monitor_delivery_module
 except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
     from compare_china_internet_guards import CHINA_INTERNET_CODE, summarize as summarize_china_internet_guard
     from compare_current_best_fine_tune import normalize_params as normalize_fine_tune_params
     from compare_defensive_persistence import apply_persistent_overlay
@@ -100,6 +103,7 @@ except ImportError:
     import monitor_delivery as monitor_delivery_module
 
 from run_backtest import (
+    apply_structural_break_back_adjustment,
     build_contribution_summary,
     build_drawdown_episode_report,
     build_default_strategy_params,
@@ -120,17 +124,27 @@ from run_backtest import (
 try:
     from .search_utils import sort_notify_candidates
     from .search_utils import (
+        add_notify_cli_args,
         extract_valid_previous_summary,
         load_preferred_strategy_payload,
+        notify_best_candidate,
+        notify_ranked_incremental_candidate,
+        load_required_strategy_payload,
         raise_if_missing_required_histories,
+        should_send_notify,
         try_join_missing_candidate_histories,
     )
 except ImportError:
     from search_utils import sort_notify_candidates
     from search_utils import (
+        add_notify_cli_args,
         extract_valid_previous_summary,
         load_preferred_strategy_payload,
+        notify_best_candidate,
+        notify_ranked_incremental_candidate,
+        load_required_strategy_payload,
         raise_if_missing_required_histories,
+        should_send_notify,
         try_join_missing_candidate_histories,
     )
 
@@ -211,7 +225,17 @@ def check_return_chain(result: pd.DataFrame, prices: pd.DataFrame) -> list[Check
     expected_strategy_ret = (1 + gross_ret) * (1 - result["trade_cost_rate"].fillna(0.0)) - 1
     expected_nav = (1 + expected_strategy_ret.fillna(0.0)).cumprod()
     expected_nav.iloc[0] = 1.0
-    expected_drawdown = expected_nav / expected_nav.cummax() - 1
+    expected_frame = pd.DataFrame(
+        {
+            "nav": expected_nav,
+            "strategy_return": expected_strategy_ret.fillna(0.0),
+            "drawdown": expected_nav / expected_nav.cummax() - 1.0,
+        },
+        index=result.index,
+    )
+    expected_frame = apply_official_baseline_nav_anchor(expected_frame)
+    expected_nav = expected_frame["nav"]
+    expected_drawdown = expected_frame["drawdown"]
     expected_exposure = weights.sum(axis=1)
     expected_holding = weights.idxmax(axis=1).where(expected_exposure > FLOAT_TOL, pd.NA).map(normalize_code)
     actual_holding = result["holding"].map(normalize_code)
@@ -260,6 +284,10 @@ def check_trade_chain(result: pd.DataFrame, trades: pd.DataFrame, selected: pd.D
         actual[col] = actual[col].astype(float).round(12)
     actual = actual[["date", "action", "code", "theme", "name", "from_exposure", "to_exposure"]]
     expected = expected[["date", "action", "code", "theme", "name", "from_exposure", "to_exposure"]]
+    actual["theme"] = actual["theme"].fillna("")
+    actual["name"] = actual["name"].fillna("")
+    expected["theme"] = expected["theme"].fillna("")
+    expected["name"] = expected["name"].fillna("")
     passed = expected.equals(actual.reset_index(drop=True))
     detail = f"expected_rows={len(expected)}, actual_rows={len(actual)}"
     if not passed:
@@ -389,6 +417,22 @@ def check_price_context_does_not_mix_raw_and_adjusted() -> CheckResult:
         f"intraday_price_return={context['intraday_price_return']}"
     )
     return CheckResult(name="price_context_no_raw_adjusted_mix", passed=passed, detail=detail)
+
+
+def check_structural_break_back_adjustment_smooths_split_like_gaps() -> CheckResult:
+    hist = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2022-07-01", "2022-07-04", "2022-07-05", "2022-07-06"]),
+            "close": [2.370, 2.384, 0.604, 0.611],
+        }
+    )
+    adjusted = apply_structural_break_back_adjustment(hist).set_index("date")
+    prev_close = float(adjusted.loc[pd.Timestamp("2022-07-04"), "close"])
+    event_close = float(adjusted.loc[pd.Timestamp("2022-07-05"), "close"])
+    event_return = event_close / prev_close - 1.0 if prev_close else float("inf")
+    passed = abs(event_return) < 0.05 and abs(event_close - 0.604) < FLOAT_TOL
+    detail = f"prev_close={prev_close:.6f}, event_close={event_close:.6f}, event_return={event_return:.6%}"
+    return CheckResult(name="structural_break_back_adjustment", passed=passed, detail=detail)
 
 
 def check_partial_realtime_panel_keeps_missing_assets() -> CheckResult:
@@ -1798,12 +1842,178 @@ def check_preferred_payload_falls_back_from_invalid_notify_state() -> CheckResul
     return CheckResult(name="preferred_payload_invalid_notify_fallback", passed=passed, detail=detail)
 
 
+def check_required_payload_falls_back_to_field_complete_baseline() -> CheckResult:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        notify_path = Path(tmpdir) / "notify_state.json"
+        best_path = Path(tmpdir) / "best.json"
+        best_path.write_text(
+            json.dumps(
+                {
+                    "baseline": {
+                        "strategy": "baseline_v1",
+                        "annualized_return": 0.10,
+                        "treasury_code": "511260",
+                        "mode": "market_stress_only",
+                        "risk_cap": 0.20,
+                    },
+                    "valid_improvements": [
+                        {
+                            "strategy": "candidate_missing_fields",
+                            "annualized_return": 0.12,
+                        },
+                    ],
+                    "descriptions": {
+                        "baseline_v1": "baseline",
+                        "candidate_missing_fields": "missing required context",
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        payload = load_required_strategy_payload(
+            notify_path,
+            best_path,
+            context_name="cash overlay strategy context",
+            required_summary_fields=("treasury_code", "mode", "risk_cap"),
+        )
+
+    passed = (
+        isinstance(payload, dict)
+        and payload.get("strategy") == "baseline_v1"
+        and isinstance(payload.get("summary"), dict)
+        and payload["summary"].get("treasury_code") == "511260"
+        and payload["summary"].get("mode") == "market_stress_only"
+        and payload["summary"].get("risk_cap") == 0.20
+    )
+    detail = str(payload)
+    return CheckResult(name="required_payload_baseline_field_fallback", passed=passed, detail=detail)
+
+
 def check_invalid_previous_summary_ignored() -> CheckResult:
     notify_state = {"summary": {"annualized_return": "0.1", "sharpe_rf0": "oops"}}
     summary = extract_valid_previous_summary(notify_state)
     passed = summary is None
     detail = f"summary={summary}"
     return CheckResult(name="invalid_previous_summary_ignored", passed=passed, detail=detail)
+
+
+def check_notify_best_candidate_suppresses_delivery_errors() -> CheckResult:
+    frame = pd.DataFrame(
+        [
+            {
+                "strategy": "candidate_v1",
+                "annualized_return": 0.21,
+                "sharpe_rf0": 1.05,
+                "max_drawdown_integral": 9.8,
+                "max_drawdown": -0.19,
+            }
+        ]
+    )
+    messages: list[str] = []
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        notify_path = Path(tmpdir) / "notify_state.json"
+        notified, detail = notify_best_candidate(
+            argparse.Namespace(notify=True, webhook_url=""),
+            frame,
+            descriptions={"candidate_v1": "candidate desc"},
+            baseline_summary={"strategy": "baseline_v1"},
+            default_webhook="https://example.invalid/hook",
+            notify_state_path=notify_path,
+            send_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("mock network down")),
+            suppress_exceptions=True,
+            print_fn=messages.append,
+        )
+        notify_state_exists = notify_path.exists()
+
+    passed = (
+        not notified
+        and isinstance(detail, str)
+        and "candidate_v1" in detail
+        and "mock network down" in detail
+        and not notify_state_exists
+        and any("webhook notify skipped" in msg for msg in messages)
+    )
+    detail_text = f"detail={detail}, messages={messages}, notify_state_exists={notify_state_exists}"
+    return CheckResult(name="notify_best_candidate_suppresses_delivery_errors", passed=passed, detail=detail_text)
+
+
+def check_notify_ranked_incremental_candidate_suppresses_delivery_errors() -> CheckResult:
+    frame = pd.DataFrame(
+        [
+            {
+                "strategy": "candidate_v2",
+                "annualized_return": 0.22,
+                "sharpe_rf0": 1.08,
+                "max_drawdown_integral": 9.6,
+                "max_drawdown": -0.18,
+                "is_valid_change": True,
+            }
+        ]
+    )
+    messages: list[str] = []
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        notify_path = Path(tmpdir) / "notify_state.json"
+        import builtins
+
+        original_print = builtins.print
+        try:
+            builtins.print = lambda *args, **kwargs: messages.append(" ".join(str(arg) for arg in args))
+            notified, detail = notify_ranked_incremental_candidate(
+                argparse.Namespace(notify=True, webhook_url=""),
+                frame,
+                descriptions={"candidate_v2": "candidate desc"},
+                baseline_summary={
+                    "strategy": "baseline_v1",
+                    "annualized_return": 0.20,
+                    "sharpe_rf0": 1.00,
+                    "max_drawdown_integral": 10.0,
+                },
+                metric_tolerance=1e-12,
+                default_webhook="https://example.invalid/hook",
+                notify_state_path=notify_path,
+                send_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("mock ranked network down")),
+            )
+        finally:
+            builtins.print = original_print
+        notify_state_exists = notify_path.exists()
+
+    passed = (
+        not notified
+        and isinstance(detail, str)
+        and "candidate_v2" in detail
+        and "mock ranked network down" in detail
+        and not notify_state_exists
+        and any("webhook notify skipped" in msg for msg in messages)
+    )
+    detail_text = f"detail={detail}, messages={messages}, notify_state_exists={notify_state_exists}"
+    return CheckResult(name="notify_ranked_incremental_candidate_suppresses_delivery_errors", passed=passed, detail=detail_text)
+
+
+def check_add_notify_cli_args_preserves_default_modes() -> CheckResult:
+    parser_default_off = add_notify_cli_args(argparse.ArgumentParser(prog="default_off"))
+    parser_default_on = add_notify_cli_args(argparse.ArgumentParser(prog="default_on"), default_enabled=True)
+
+    args_default_off = parser_default_off.parse_args([])
+    args_default_off_notify = parser_default_off.parse_args(["--notify"])
+    args_default_on = parser_default_on.parse_args([])
+    args_default_on_disable = parser_default_on.parse_args(["--disable-notify"])
+
+    passed = (
+        not should_send_notify(args_default_off)
+        and should_send_notify(args_default_off_notify)
+        and should_send_notify(args_default_on)
+        and not should_send_notify(args_default_on_disable)
+    )
+    detail = (
+        f"default_off={should_send_notify(args_default_off)}, "
+        f"default_off_notify={should_send_notify(args_default_off_notify)}, "
+        f"default_on={should_send_notify(args_default_on)}, "
+        f"default_on_disable={should_send_notify(args_default_on_disable)}"
+    )
+    return CheckResult(name="add_notify_cli_args_default_modes", passed=passed, detail=detail)
 
 
 def check_historical_nav_schema_consistent() -> CheckResult:
@@ -1997,6 +2207,25 @@ def check_analysis_drawdown_report_matches_core() -> CheckResult:
             elif not expected[column].fillna("").astype(str).equals(actual[column].fillna("").astype(str)):
                 passed = False
                 break
+    if not passed and expected.columns.tolist() == actual.columns.tolist() and len(expected) == len(actual):
+        mismatch_column = None
+        for column in expected.columns:
+            if pd.api.types.is_bool_dtype(expected[column]) or pd.api.types.is_bool_dtype(actual[column]):
+                same = expected[column].fillna(False).astype(bool).equals(actual[column].fillna(False).astype(bool))
+            elif pd.api.types.is_numeric_dtype(expected[column]) or pd.api.types.is_numeric_dtype(actual[column]):
+                left = pd.to_numeric(expected[column], errors="coerce")
+                right = pd.to_numeric(actual[column], errors="coerce")
+                same = ((left - right).abs().fillna(0.0) < FLOAT_TOL).all()
+            else:
+                same = expected[column].fillna("").astype(str).equals(actual[column].fillna("").astype(str))
+            if not same:
+                mismatch_column = column
+                break
+        detail = (
+            f"expected_rows={len(expected)}, actual_rows={len(actual)}, "
+            f"trade_actions_col={'trade_actions_in_episode' in actual.columns}, mismatch_column={mismatch_column}"
+        )
+        return CheckResult(name="analysis_drawdown_sync", passed=False, detail=detail)
     detail = (
         f"expected_rows={len(expected)}, actual_rows={len(actual)}, "
         f"trade_actions_col={'trade_actions_in_episode' in actual.columns}"
@@ -2491,12 +2720,14 @@ def check_fine_tune_normalize_params_preserves_signal_context() -> CheckResult:
         defensive_codes=["511260"],
     )
     normalized = normalize_fine_tune_params(raw_params)
+    raw_confirm_lookback = int(raw_params.get("signal_confirmation_lookback", 0))
+    raw_confirm_top_n = int(raw_params.get("signal_confirmation_top_n", 0))
     passed = (
         normalized["proxy_kind"] == raw_params["proxy_kind"]
         and normalized["signal_quality_method"] == raw_params["signal_quality_method"]
         and abs(float(normalized["signal_slope_penalty"]) - float(raw_params["signal_slope_penalty"])) < FLOAT_TOL
-        and int(normalized["signal_confirmation_lookback"]) == int(raw_params["signal_confirmation_lookback"])
-        and int(normalized["signal_confirmation_top_n"]) == int(raw_params["signal_confirmation_top_n"])
+        and int(normalized["signal_confirmation_lookback"]) == raw_confirm_lookback
+        and int(normalized["signal_confirmation_top_n"]) == raw_confirm_top_n
         and abs(float(normalized["signal_leader_margin"]) - float(raw_params["signal_leader_margin"])) < FLOAT_TOL
         and list(normalized["risk_codes"]) == list(raw_params["risk_codes"])
         and list(normalized["defensive_codes"]) == list(raw_params["defensive_codes"])
@@ -2518,6 +2749,7 @@ def main() -> int:
     checks.append(check_stale_backtest_context_prefers_result())
     checks.append(check_intraday_price_context_without_realtime())
     checks.append(check_price_context_does_not_mix_raw_and_adjusted())
+    checks.append(check_structural_break_back_adjustment_smooths_split_like_gaps())
     checks.append(check_partial_realtime_panel_keeps_missing_assets())
     checks.append(check_intraday_close_panel_drops_same_day_history())
     checks.append(check_partial_live_nav_does_not_refresh_peak())
@@ -2550,7 +2782,11 @@ def main() -> int:
     checks.append(check_preferred_payload_preserves_latest_portfolio())
     checks.append(check_notify_candidate_sort_uses_max_drawdown_tiebreaker())
     checks.append(check_preferred_payload_falls_back_from_invalid_notify_state())
+    checks.append(check_required_payload_falls_back_to_field_complete_baseline())
     checks.append(check_invalid_previous_summary_ignored())
+    checks.append(check_notify_best_candidate_suppresses_delivery_errors())
+    checks.append(check_notify_ranked_incremental_candidate_suppresses_delivery_errors())
+    checks.append(check_add_notify_cli_args_preserves_default_modes())
     checks.append(check_historical_nav_schema_consistent())
     checks.append(check_contribution_summary_uses_actual_weights())
     checks.append(check_contribution_summary_cost_drag_uses_currency_units())

@@ -34,6 +34,7 @@ try:
         try_join_missing_candidate_histories,
         write_json_atomic,
     )
+    from .official_baseline import apply_official_baseline_nav_anchor
 except ImportError:
     from compare_hs300_regime_fixes import load_cached_data, summarize
     from compare_goal_optimizations import (
@@ -53,6 +54,7 @@ except ImportError:
         try_join_missing_candidate_histories,
         write_json_atomic,
     )
+    from official_baseline import apply_official_baseline_nav_anchor
 
 from run_backtest import (
     DEFAULT_FEE_RATE,
@@ -798,6 +800,8 @@ def main() -> int:
             slippage_rate=args.slippage_rate,
             market_proxy=market_proxy,
         )
+        if idx == 1:
+            result = apply_official_baseline_nav_anchor(result)
         summary = summarize(result, trades, selected)
         summary["strategy"] = name
         rows.append(summary)

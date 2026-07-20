@@ -4,10 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
+MOMENTUM_DIR = Path(__file__).resolve().parents[2]
+if str(MOMENTUM_DIR) not in sys.path:
+    sys.path.insert(0, str(MOMENTUM_DIR))
+
 try:
-    from ..runtime_env import prepare_local_imports
+    from ...runtime_env import prepare_local_imports
 except ImportError:
     from runtime_env import prepare_local_imports
 
@@ -15,10 +20,32 @@ prepare_local_imports(__file__)
 
 import pandas as pd
 
-from compare_current_best_pool_additions import apply_pool_change
-from compare_goal_optimizations import load_market_volume_proxy
-from compare_hs300_regime_fixes import run_target_weights_strategy, summarize
-from run_backtest import (
+from archive_data_loaders import (
+    build_archive_flat_output_dir,
+    build_cash_tail_mask,
+    build_risk_defensive_momentum_frames,
+    extract_result_target_weights,
+    filter_selected_price_columns,
+    load_required_candidate_prices,
+)
+
+try:
+    from ...official_baseline import apply_official_baseline_nav_anchor
+except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
+
+from variant_compare_helpers import (
+    append_variant_result,
+    build_compare_frame,
+    filter_available_plot_lines,
+    finalize_baseline_diff_summary,
+    save_plot_and_print_variant_compare_outputs,
+)
+from goal_optimization_common import load_market_volume_proxy
+from hs300_regime_common import run_target_weights_strategy, summarize
+from candidate_pool_common import ETF_159930, ETF_510410
+from pool_change_helpers import apply_pool_change
+from archive_strategy_common import (
     DEFAULT_BASELINE_DROP_CODES,
     DEFAULT_FEE_RATE,
     DEFAULT_LOOKBACK,
@@ -27,47 +54,36 @@ from run_backtest import (
     fetch_histories,
     load_default_strategy_backtest_pool,
     run_default_strategy_with_params,
-    write_dataframe_csv_atomic,
 )
 
 
-OUTPUT_DIR = Path("momentum_backtest/output/research/archive_flat/compare_resource_energy_common_sense")
-ETF_159930 = {"theme": "能源", "code": "159930", "name": "能源ETF", "sina_symbol": "sz159930"}
-ETF_510410 = {"theme": "资源", "code": "510410", "name": "资源ETF", "sina_symbol": "sh510410"}
+OUTPUT_DIR = build_archive_flat_output_dir("compare_resource_energy_common_sense")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="基于当前正式基线，对比资源/能源补位及其叠加极端现金停车。")
     parser.add_argument("--years", type=int, default=15, help="回测最近多少年。")
+    parser.add_argument("--refresh", action="store_true", help="重新抓取缺失历史，而不是优先复用本地缓存。")
+    parser.add_argument("--base-only", action="store_true", help="只运行当前正式基线，不补抓资源/能源历史。")
     return parser.parse_args()
 
 
-def extract_target_weights(result: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
-    weight_cols = [col for col in result.columns if col.startswith("target_weight_")]
-    target_weights = result[weight_cols].copy()
-    target_weights.columns = [col.removeprefix("target_weight_") for col in weight_cols]
-    return target_weights.reindex(index=prices.index, columns=prices.columns, fill_value=0.0).fillna(0.0)
-
-
-def build_momentum_frames(prices: pd.DataFrame, risk_codes: list[str], defensive_codes: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
-    momentum = prices / prices.shift(DEFAULT_LOOKBACK) - 1
-    risk_momentum = momentum[[code for code in risk_codes if code in momentum.columns]].copy()
-    defensive_momentum = momentum[[code for code in defensive_codes if code in momentum.columns]].copy()
-    return risk_momentum, defensive_momentum
-
-
-def build_cash_tail_mask(risk_momentum: pd.DataFrame, defensive_momentum: pd.DataFrame) -> pd.Series:
-    valid_risk_count = risk_momentum.notna().sum(axis=1)
-    risk_positive_count = (risk_momentum > 0).sum(axis=1)
-    risk_max = risk_momentum.max(axis=1, skipna=True)
-    defensive_max = defensive_momentum.max(axis=1, skipna=True)
-    return (
-        (valid_risk_count >= max(len(risk_momentum.columns) - 1, 1))
-        & (risk_positive_count <= 1)
-        & (risk_max <= 0.03)
-        & (defensive_max <= -0.005)
-    ).fillna(False)
-
+def load_combined_prices(selected: pd.DataFrame, *, years: int, refresh: bool) -> pd.DataFrame:
+    _, prices = load_required_candidate_prices(
+        selected.iloc[0:0].copy(),
+        selected,
+        years=years,
+        refresh=refresh,
+        fetch_fn=fetch_histories,
+        label="resource/energy candidates",
+        failure_prefix="failed to prepare resource/energy candidate histories",
+    )
+    prices = filter_selected_price_columns(prices, selected)
+    prices = prices.loc[prices.index >= pd.Timestamp("2012-01-01")].copy()
+    prices = prices.dropna(how="any")
+    if prices.empty:
+        raise RuntimeError("resource/energy comparison has no overlapping non-null price window")
+    return prices
 
 def evaluate_strategy(
     name: str,
@@ -91,7 +107,9 @@ def evaluate_strategy(
         market_proxy=market_proxy,
     )
     row = summarize(result, trades, selected)
-    row["strategy"] = name
+    if name == "base_pool":
+        result = apply_official_baseline_nav_anchor(result)
+        row = summarize(result, trades, selected)
     row["cash_days"] = int((result["exposure"] <= 1e-12).sum())
     return row, result
 
@@ -104,8 +122,13 @@ def evaluate_cash_tail_variant(
     risk_codes: list[str],
     defensive_codes: list[str],
 ) -> tuple[dict[str, object], pd.DataFrame]:
-    target_weights = extract_target_weights(base_result, prices)
-    risk_momentum, defensive_momentum = build_momentum_frames(prices, risk_codes, defensive_codes)
+    target_weights = extract_result_target_weights(base_result, prices)
+    risk_momentum, defensive_momentum = build_risk_defensive_momentum_frames(
+        prices,
+        risk_codes=risk_codes,
+        defensive_codes=defensive_codes,
+        lookback=DEFAULT_LOOKBACK,
+    )
     cash_mask = build_cash_tail_mask(risk_momentum, defensive_momentum)
     target_weights.loc[cash_mask, :] = 0.0
     result, trades = run_target_weights_strategy(
@@ -117,15 +140,20 @@ def evaluate_cash_tail_variant(
         slippage_rate=DEFAULT_SLIPPAGE_RATE,
     )
     row = summarize(result, trades, selected)
-    row["strategy"] = name
     row["cash_days"] = int((result["exposure"] <= 1e-12).sum())
     row["cash_days_triggered"] = int(cash_mask.sum())
     return row, result
 
 
+def build_combined_selected(base_selected: pd.DataFrame) -> pd.DataFrame:
+    """一次性补齐本脚本涉及的额外候选，避免每个变体重复拉历史。"""
+    extra_selected = pd.DataFrame([ETF_159930, ETF_510410])
+    combined = pd.concat([base_selected, extra_selected], ignore_index=True)
+    return combined.drop_duplicates(subset="code", keep="first").reset_index(drop=True)
+
+
 def main() -> int:
     args = parse_args()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     base_selected = load_default_strategy_backtest_pool().copy()
     market_proxy = load_market_volume_proxy(years=args.years, refresh=False)
@@ -134,9 +162,14 @@ def main() -> int:
         {"pool": "plus_resource_510410", "kind": "add", "candidate_kind": "risk", "candidate": ETF_510410},
         {"pool": "plus_energy_159930", "kind": "add", "candidate_kind": "risk", "candidate": ETF_159930},
     ]
+    if args.base_only:
+        changes = changes[:1]
+
+    combined_selected = base_selected if args.base_only else build_combined_selected(base_selected)
+    combined_prices = load_combined_prices(combined_selected, years=args.years, refresh=args.refresh)
 
     rows: list[dict[str, object]] = []
-    nav_compare = pd.DataFrame()
+    nav_compare = build_compare_frame(combined_prices)
 
     for change in changes:
         selected, risk_codes, defensive_codes, effective_drop_codes = apply_pool_change(
@@ -144,8 +177,8 @@ def main() -> int:
             list(DEFAULT_BASELINE_DROP_CODES),
             change,
         )
-        prices = fetch_histories(selected, years=args.years)
-        prices = prices.loc[prices.index >= pd.Timestamp("2012-01-01")].copy()
+        selected_codes = [code for code in selected["code"].astype(str) if code in combined_prices.columns]
+        prices = combined_prices[selected_codes].copy()
 
         row, result = evaluate_strategy(
             str(change["pool"]),
@@ -156,8 +189,15 @@ def main() -> int:
             defensive_codes,
             effective_drop_codes,
         )
-        rows.append(row)
-        nav_compare[str(change["pool"])] = result["nav"]
+        append_variant_result(
+            rows,
+            nav_compare,
+            None,
+            strategy=str(change["pool"]),
+            result=result,
+            summary=row,
+            nav_column=str(change["pool"]),
+        )
 
         if str(change["pool"]) != "base_pool":
             cash_row, cash_result = evaluate_cash_tail_variant(
@@ -168,24 +208,52 @@ def main() -> int:
                 risk_codes,
                 defensive_codes,
             )
-            rows.append(cash_row)
-            nav_compare[f"{change['pool']}__cash_tail"] = cash_result["nav"]
+            append_variant_result(
+                rows,
+                nav_compare,
+                None,
+                strategy=f"{change['pool']}__cash_tail",
+                result=cash_result,
+                summary=cash_row,
+                nav_column=f"{change['pool']}__cash_tail",
+            )
 
-    summary_df = pd.DataFrame(rows)
-    base = summary_df[summary_df["strategy"] == "base_pool"].iloc[0]
-    summary_df["annualized_diff"] = summary_df["annualized_return"] - float(base["annualized_return"])
-    summary_df["sharpe_diff"] = summary_df["sharpe_rf0"] - float(base["sharpe_rf0"])
-    summary_df["max_drawdown_diff"] = summary_df["max_drawdown"] - float(base["max_drawdown"])
-    summary_df["max_drawdown_integral_diff"] = summary_df["max_drawdown_integral"] - float(base["max_drawdown_integral"])
-    summary_df["trade_diff"] = summary_df["trade_count"] - int(base["trade_count"])
-    summary_df["cash_days_diff"] = summary_df["cash_days"] - int(base["cash_days"])
+    summary_df = finalize_baseline_diff_summary(
+        rows,
+        baseline_field="strategy",
+        baseline_value="base_pool",
+        metric_mappings=(
+            ("annualized_return", "annualized_diff"),
+            ("sharpe_rf0", "sharpe_diff"),
+            ("max_drawdown", "max_drawdown_diff"),
+            ("max_drawdown_integral", "max_drawdown_integral_diff"),
+            ("trade_count", "trade_diff"),
+            ("cash_days", "cash_days_diff"),
+        ),
+    )
 
-    write_dataframe_csv_atomic(summary_df, OUTPUT_DIR / "summary.csv", index=False)
-    write_dataframe_csv_atomic(nav_compare, OUTPUT_DIR / "nav_compare.csv")
-
-    print(summary_df.to_csv(index=False))
+    plot_lines = [
+        ("base_pool", "Base Pool", 2.2),
+        ("plus_resource_510410", "+510410", 1.8),
+        ("plus_resource_510410__cash_tail", "+510410 Cash Tail", 1.8),
+        ("plus_energy_159930", "+159930", 1.8),
+        ("plus_energy_159930__cash_tail", "+159930 Cash Tail", 1.8),
+    ]
+    available_plot_lines = filter_available_plot_lines(nav_compare, plot_lines)
+    save_plot_and_print_variant_compare_outputs(
+        OUTPUT_DIR,
+        summary_df,
+        nav_compare,
+        plot_filename="comparison.png",
+        title="Resource Energy Common Sense Comparison",
+        lines=available_plot_lines,
+    )
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1)

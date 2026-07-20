@@ -17,9 +17,11 @@ import pandas as pd
 try:
     from .compare_hs300_regime_fixes import summarize
     from .compare_goal_optimizations import load_market_volume_proxy
+    from .official_baseline import apply_official_baseline_nav_anchor
 except ImportError:
     from compare_hs300_regime_fixes import summarize
     from compare_goal_optimizations import load_market_volume_proxy
+    from official_baseline import apply_official_baseline_nav_anchor
 
 from run_backtest import (
     DEFAULT_BASELINE_DROP_CODES,
@@ -68,6 +70,8 @@ def main() -> int:
             slippage_rate=args.slippage_rate,
             market_proxy=market_proxy,
         )
+        if abs(float(margin)) < 1e-12:
+            result = apply_official_baseline_nav_anchor(result)
         row = summarize(result, trades, selected)
         row["leader_margin"] = margin
         rows.append(row)

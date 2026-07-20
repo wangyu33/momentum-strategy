@@ -41,7 +41,9 @@ def prepare_local_imports(module_file: str | Path, *, include_module_dir: bool =
 
     local_site_packages = workspace_dir / ".tools" / "python_packages"
     if local_site_packages.exists() and str(local_site_packages) not in sys.path:
-        sys.path.insert(0, str(local_site_packages))
+        # `.tools/python_packages` 只作为兜底补充，避免覆盖当前解释器
+        # 已安装且 ABI 匹配的 site-packages。
+        sys.path.append(str(local_site_packages))
 
     scrub_user_site_packages()
 

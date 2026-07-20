@@ -1,0 +1,2 @@
+total_return,annualized_return,annualized_volatility,sharpe_rf0,max_drawdown,trade_count,avg_exposure,latest_holding_code,latest_holding_theme,latest_holding_name,latest_momentum,latest_exposure,pool,defensive_codes,return_diff,annualized_diff,sharpe_diff,mdd_diff,trade_diff
+25.87667179699164,0.3900660969417937,0.2539041066442598,1.5362732887511266,-0.18982759788871417,919,0.9149567367119901,512890,红利低波ETF,红利低波ETF华泰柏瑞,0.026011560693641522,0.8,base_pool,"511580,518880,512890",0.0,0.0,0.0,0.0,0

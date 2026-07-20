@@ -16,7 +16,12 @@ configure_matplotlib_env()
 import matplotlib
 import pandas as pd
 
-from compare_goal_optimizations import MARKET_VOLUME_CACHE_PATH
+try:
+    from .official_baseline import apply_official_baseline_nav_anchor
+except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
+
+from goal_optimization_common import MARKET_VOLUME_CACHE_PATH
 from run_backtest import (
     DEFAULT_FEE_RATE,
     DEFAULT_SLIPPAGE_RATE,
@@ -115,6 +120,8 @@ def main() -> int:
             slippage_rate=args.slippage_rate,
             market_proxy=market_proxy,
         )
+        if strategy_name == "baseline":
+            result = apply_official_baseline_nav_anchor(result)
         summary_rows.append(summarize(strategy_name, result, trades, selected))
         compare_df[f"{strategy_name}_nav"] = result["nav"]
 

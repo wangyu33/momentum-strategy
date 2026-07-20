@@ -17,10 +17,12 @@ import matplotlib
 import pandas as pd
 
 try:
-    from .compare_candidate_pool_additions import BASE_DEFENSIVE_CODES, BASE_RISK_CODES
+    from .candidate_pool_common import BASE_DEFENSIVE_CODES, BASE_RISK_CODES
+    from .official_baseline import apply_official_baseline_nav_anchor
     from .compare_strategy_refinements import run_signal_strategy
 except ImportError:
-    from compare_candidate_pool_additions import BASE_DEFENSIVE_CODES, BASE_RISK_CODES
+    from candidate_pool_common import BASE_DEFENSIVE_CODES, BASE_RISK_CODES
+    from official_baseline import apply_official_baseline_nav_anchor
     from compare_strategy_refinements import run_signal_strategy
 
 from run_backtest import (
@@ -213,6 +215,8 @@ def main() -> int:
             resource_margin_threshold=margin_thr if include_resource else None,
             resource_max_exposure=max_exposure if include_resource else None,
         )
+        if name == "base_pool":
+            result = apply_official_baseline_nav_anchor(result)
         if compare_df is None:
             compare_df = pd.DataFrame(index=result.index)
             compare_df["hs300_benchmark"] = build_benchmark_nav(current_prices, benchmark_code="510300")

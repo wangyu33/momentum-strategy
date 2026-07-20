@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
-"""Grid-search threshold dual momentum parameters."""
+"""Grid-search threshold dual momentum parameters.
+
+This script compares historical single/dual-momentum variants rather than the official
+28.2691 formal baseline, so it should keep its own research-chain semantics.
+"""
 
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+MOMENTUM_DIR = Path(__file__).resolve().parents[2]
+if str(MOMENTUM_DIR) not in sys.path:
+    sys.path.insert(0, str(MOMENTUM_DIR))
 
 try:
-    from ..runtime_env import configure_matplotlib_env, prepare_local_imports
+    from ...runtime_env import configure_matplotlib_env, prepare_local_imports
 except ImportError:
     from runtime_env import configure_matplotlib_env, prepare_local_imports
 
@@ -16,29 +26,33 @@ configure_matplotlib_env()
 import matplotlib
 import pandas as pd
 
-from compare_dual_momentum_variants import (
+from archive_data_loaders import build_archive_flat_output_dir, load_core_selected_and_prices
+from dual_momentum_helpers import (
     DEFENSIVE_CODES,
     RISK_CODES,
-    load_cached_data,
     run_exposure_strategy,
     summarize,
 )
-from run_backtest import (
+from variant_compare_helpers import (
+    append_variant_result,
+    build_compare_frame,
+    finalize_baseline_diff_summary,
+    save_plot_and_print_variant_compare_outputs,
+    save_named_nav_and_trades,
+)
+from archive_strategy_common import (
     DEFAULT_FEE_RATE,
     DEFAULT_SLIPPAGE_RATE,
-    RESEARCH_OUTPUT_DIR,
-    build_benchmark_nav,
-    ensure_output_dirs,
     fetch_histories,
     load_fixed_etf_pool,
     run_strategy,
 )
 
 matplotlib.use("Agg")
-from matplotlib import pyplot as plt
 
 
-OUTPUT_DIR = RESEARCH_OUTPUT_DIR / "archive_flat" / "tune_threshold_dual_momentum"
+OUTPUT_DIR = build_archive_flat_output_dir("tune_threshold_dual_momentum")
+INTENTIONALLY_UNANCHORED_BASELINE = True
 
 
 def parse_args() -> argparse.Namespace:
@@ -109,11 +123,12 @@ def main() -> int:
     thresholds = parse_float_list(args.thresholds)
     defensive_weights = parse_float_list(args.defensive_weights)
 
-    if args.refresh:
-        selected = load_fixed_etf_pool()
-        prices = fetch_histories(selected, years=args.years)
-    else:
-        selected, prices = load_cached_data()
+    selected, prices = load_core_selected_and_prices(
+        load_fixed_etf_pool(),
+        years=args.years,
+        refresh=args.refresh,
+        fetch_fn=fetch_histories,
+    )
 
     base_result, base_trades = run_strategy(
         prices,
@@ -122,10 +137,17 @@ def main() -> int:
         fee_rate=args.fee_rate,
         slippage_rate=args.slippage_rate,
     )
-    rows = [{"strategy": "single_momentum", **summarize(base_result, base_trades, selected)}]
-    compare_df = pd.DataFrame(index=prices.index)
-    compare_df["single_momentum_nav"] = base_result["nav"]
-    compare_df["hs300_benchmark"] = build_benchmark_nav(prices, benchmark_code="510300")
+    rows: list[dict[str, object]] = []
+    compare_df = build_compare_frame(prices)
+    append_variant_result(
+        rows,
+        compare_df,
+        None,
+        strategy="single_momentum",
+        result=base_result,
+        summary=summarize(base_result, base_trades, selected),
+        nav_column="single_momentum_nav",
+    )
 
     best_key = None
     best_sharpe = -1e9
@@ -143,54 +165,53 @@ def main() -> int:
                 defensive_weight=defensive_weight,
             )
             key = f"thr_{threshold:.0%}_def_{defensive_weight:.0%}"
-            row = {
-                "strategy": key,
-                "threshold": threshold,
-                "weak_trend_def_weight": defensive_weight,
-                **summarize(result, trades, selected),
-            }
-            rows.append(row)
-            compare_df[f"{key}_nav"] = result["nav"]
+            row = summarize(result, trades, selected)
+            append_variant_result(
+                rows,
+                compare_df,
+                None,
+                strategy=key,
+                result=result,
+                summary=row,
+                nav_column=f"{key}_nav",
+                extra_fields={
+                    "threshold": threshold,
+                    "weak_trend_def_weight": defensive_weight,
+                },
+            )
             if row["sharpe_rf0"] > best_sharpe:
                 best_sharpe = row["sharpe_rf0"]
                 best_key = key
                 best_result = result
                 best_trades = trades
 
-    summary = pd.DataFrame(rows)
-    base = summary.iloc[0]
-    summary["return_diff"] = summary["total_return"] - base["total_return"]
-    summary["annualized_diff"] = summary["annualized_return"] - base["annualized_return"]
-    summary["sharpe_diff"] = summary["sharpe_rf0"] - base["sharpe_rf0"]
-    summary["mdd_diff"] = summary["max_drawdown"] - base["max_drawdown"]
-    summary["trade_diff"] = summary["trade_count"] - base["trade_count"]
+    summary = finalize_baseline_diff_summary(
+        rows,
+        baseline_field="strategy",
+        baseline_value="single_momentum",
+        metric_mappings=[
+            ("total_return", "return_diff"),
+            ("annualized_return", "annualized_diff"),
+            ("sharpe_rf0", "sharpe_diff"),
+            ("max_drawdown", "mdd_diff"),
+            ("trade_count", "trade_diff"),
+        ],
+    )
     summary = summary.sort_values(["sharpe_rf0", "annualized_return"], ascending=[False, False])
 
-    ensure_output_dirs()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    summary.to_csv(OUTPUT_DIR / "summary.csv", index=False)
-    compare_df.to_csv(OUTPUT_DIR / "nav_compare.csv")
     if best_result is not None and best_trades is not None and best_key is not None:
-        best_result.to_csv(OUTPUT_DIR / "best_nav.csv")
-        best_trades.to_csv(OUTPUT_DIR / "best_trades.csv", index=False)
+        save_named_nav_and_trades(OUTPUT_DIR, "best", best_result, best_trades)
 
-    plt.style.use("seaborn-v0_8-whitegrid")
-    fig, ax = plt.subplots(figsize=(14, 7))
-    ax.plot(compare_df.index, compare_df["single_momentum_nav"], linewidth=2.2, label="Single Momentum")
     top_rows = summary[summary["strategy"] != "single_momentum"].head(3)
-    for _, row in top_rows.iterrows():
-        key = row["strategy"]
-        ax.plot(compare_df.index, compare_df[f"{key}_nav"], linewidth=1.8, label=key)
-    ax.plot(compare_df.index, compare_df["hs300_benchmark"], linewidth=1.6, linestyle="--", label="HS300")
-    ax.set_title("Threshold Dual Momentum Grid Search", loc="left", fontsize=16, fontweight="bold")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Net Value")
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(OUTPUT_DIR / "comparison.png", dpi=180, bbox_inches="tight")
-    plt.close(fig)
-
-    print(summary.to_csv(index=False))
+    save_plot_and_print_variant_compare_outputs(
+        OUTPUT_DIR,
+        summary,
+        compare_df,
+        plot_filename="comparison.png",
+        title="Threshold Dual Momentum Grid Search",
+        lines=[("single_momentum_nav", "Single Momentum", 2.2)]
+        + [(f"{row['strategy']}_nav", str(row["strategy"]), 1.8) for _, row in top_rows.iterrows()],
+    )
     if best_key:
         print(f"best_by_sharpe={best_key}")
     return 0

@@ -1,45 +1,58 @@
 #!/usr/bin/env python3
-"""Fine-grid search around the strongest stress-bond near-miss candidate."""
+"""Fine-grid search around the strongest stress-bond near-miss candidate.
+
+This baseline inherits an upstream stress-bond historical winner rather than the official
+28.2691 formal baseline, so this script must keep its own research-chain semantics.
+"""
 
 from __future__ import annotations
 
 import argparse
-import json
-import os
+import sys
 from pathlib import Path
 
+MOMENTUM_DIR = Path(__file__).resolve().parents[2]
+if str(MOMENTUM_DIR) not in sys.path:
+    sys.path.insert(0, str(MOMENTUM_DIR))
+
 try:
-    from ..runtime_env import prepare_local_imports, write_json_atomic
+    from ...runtime_env import prepare_local_imports
 except ImportError:
-    from runtime_env import prepare_local_imports, write_json_atomic
+    from runtime_env import prepare_local_imports
 
 prepare_local_imports(__file__)
 
 import pandas as pd
 
-from compare_goal_optimizations import DEFAULT_FEISHU_WEBHOOK, METRIC_TOLERANCE, send_improvement_notification
-from compare_hs300_regime_fixes import load_cached_data, summarize
-from compare_market_proxy_variants import build_proxy_catalog
-from compare_stressbond_nearmiss_repair import (
-    apply_overlay,
-    load_overlay_context,
+from archive_data_loaders import build_archive_flat_strategy_paths, load_named_market_proxy, load_recent_selected_prices
+from goal_optimization_common import DEFAULT_FEISHU_WEBHOOK, METRIC_TOLERANCE, send_improvement_notification
+from hs300_regime_common import summarize
+from context_loaders import load_stressbond_nearmiss_context
+from overlay_candidate_catalog import lookup_overlay_asset
+from search_utils import (
+    add_notify_cli_args,
+    extract_ranked_valid_improvements,
 )
-from compare_tail_risk_bond_overlay import load_market_proxy_best_context
-from run_backtest import (
+from stressbond_strategy_helpers import apply_stressbond_overlay
+from tail_risk_overlay_common import load_market_proxy_best_context
+from variant_compare_helpers import (
+    append_variant_result,
+    build_baseline_preview_columns,
+    build_compare_frame,
+    filter_available_plot_lines,
+    save_plot_and_print_baseline_preview,
+    save_best_payload_and_notify_ranked,
+    save_best_payload_and_notify_ranked_webhook,
+)
+from archive_strategy_common import (
     DEFAULT_FEE_RATE,
     DEFAULT_SLIPPAGE_RATE,
-    ensure_output_dirs,
     load_fixed_etf_pool,
-    write_dataframe_csv_atomic,
 )
-from compare_candidate_pool_additions import ETF_511260
 
 
-OUTPUT_DIR = Path("momentum_backtest/output/research/archive_flat/compare_stressbond_edge_refine")
-SUMMARY_PATH = OUTPUT_DIR / "summary.csv"
-COMPARE_PATH = OUTPUT_DIR / "nav_compare.csv"
-BEST_PATH = OUTPUT_DIR / "best.json"
-NOTIFY_STATE_PATH = OUTPUT_DIR / "notify_state.json"
+OUTPUT_DIR, BEST_PATH, NOTIFY_STATE_PATH = build_archive_flat_strategy_paths("compare_stressbond_edge_refine")
+INTENTIONALLY_UNANCHORED_BASELINE = True
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,54 +60,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--years", type=int, default=15, help="Backtest years.")
     parser.add_argument("--fee-rate", type=float, default=DEFAULT_FEE_RATE, help="Single-side fee rate.")
     parser.add_argument("--slippage-rate", type=float, default=DEFAULT_SLIPPAGE_RATE, help="Single-side slippage rate.")
-    parser.add_argument("--notify", action="store_true", help="Send webhook notification if a better strategy is found.")
-    parser.add_argument("--webhook-url", type=str, default="", help="Webhook URL override.")
+    add_notify_cli_args(parser)
     return parser.parse_args()
-
-
-def rank_valid_improvements(frame: pd.DataFrame, baseline: pd.Series) -> pd.DataFrame:
-    if frame.empty:
-        return frame
-    ranked = frame.copy()
-    ranked["annualized_return_gain"] = ranked["annualized_return"] - float(baseline["annualized_return"])
-    ranked["sharpe_gain"] = ranked["sharpe_rf0"] - float(baseline["sharpe_rf0"])
-    ranked["drawdown_integral_improvement"] = float(baseline["max_drawdown_integral"]) - ranked["max_drawdown_integral"]
-    ranked["composite_improvement_score"] = (
-        ranked["annualized_return_gain"] * 100
-        + ranked["sharpe_gain"] * 10
-        + ranked["drawdown_integral_improvement"] / 10
-    )
-    return ranked.sort_values(
-        [
-            "composite_improvement_score",
-            "annualized_return_gain",
-            "sharpe_gain",
-            "drawdown_integral_improvement",
-            "annualized_return",
-            "sharpe_rf0",
-            "max_drawdown_integral",
-        ],
-        ascending=[False, False, False, False, False, False, True],
-    )
-
-
-def load_notify_state() -> dict[str, object] | None:
-    if NOTIFY_STATE_PATH.exists():
-        return json.loads(NOTIFY_STATE_PATH.read_text(encoding="utf-8"))
-    return None
-
-
-def save_notify_state(strategy_name: str, summary: dict[str, object], description: str) -> None:
-    write_json_atomic(NOTIFY_STATE_PATH, {"strategy": strategy_name, "summary": summary, "description": description})
-
 
 def main() -> int:
     args = parse_args()
-    ensure_output_dirs()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
     market_context = load_market_proxy_best_context()
-    overlay_context = load_overlay_context()
+    overlay_context = load_stressbond_nearmiss_context()
+    treasury_row = lookup_overlay_asset(overlay_context["treasury_code"])
     params = dict(market_context["params"])
     params["volume_ratio_cut"] = float(market_context["volume_ratio_cut"])
     params["volume_short_ratio_cut"] = float(market_context["volume_short_ratio_cut"])
@@ -103,24 +76,16 @@ def main() -> int:
 
     base_selected = load_fixed_etf_pool()
     base_selected = base_selected[~base_selected["code"].astype(str).isin(drop_codes)].reset_index(drop=True)
-    selected = pd.concat([base_selected, pd.DataFrame([ETF_511260])], ignore_index=True)
+    selected = pd.concat([base_selected, pd.DataFrame([treasury_row])], ignore_index=True)
 
-    _, prices = load_cached_data()
-    start_ts = prices.index.max() - pd.DateOffset(years=args.years)
-    prices = prices.loc[prices.index >= start_ts].copy()
-    prices = prices[[code for code in selected["code"].astype(str) if code in prices.columns]].copy()
-
-    from compare_goal_optimizations import load_market_volume_proxy
-
-    base_market_proxy = load_market_volume_proxy(years=args.years, refresh=False)
-    proxy_catalog = {item["name"]: item["proxy"] for item in build_proxy_catalog(base_market_proxy, prices)}
-    proxy = proxy_catalog[str(market_context["proxy_kind"])]
+    prices = load_recent_selected_prices(selected, args.years)
+    proxy = load_named_market_proxy(prices, years=args.years, proxy_kind=str(market_context["proxy_kind"]))
 
     rows: list[dict[str, object]] = []
     descriptions: dict[str, str] = {}
-    nav_compare = pd.DataFrame(index=prices.index)
+    nav_compare = build_compare_frame(prices)
 
-    baseline_result, baseline_trades = apply_overlay(
+    baseline_result, baseline_trades = apply_stressbond_overlay(
         prices=prices,
         selected=selected,
         proxy=proxy,
@@ -135,11 +100,16 @@ def main() -> int:
         fee_rate=args.fee_rate,
         slippage_rate=args.slippage_rate,
     )
-    baseline_summary = summarize(baseline_result, baseline_trades, selected)
-    baseline_summary["strategy"] = overlay_context["strategy"]
-    rows.append(baseline_summary)
-    nav_compare[f"{overlay_context['strategy']}_nav"] = baseline_result["nav"]
-    descriptions[str(overlay_context["strategy"])] = overlay_context["description"]
+    append_variant_result(
+        rows,
+        nav_compare,
+        descriptions,
+        strategy=str(overlay_context["strategy"]),
+        result=baseline_result,
+        summary=summarize(baseline_result, baseline_trades, selected),
+        description=overlay_context["description"],
+    )
+    baseline_summary = rows[-1]
 
     risk_cap_candidates = [0.178, 0.180, 0.182, 0.185, 0.188, 0.190, 0.192]
     vg_cap_candidates = [0.285, 0.290, 0.295]
@@ -161,7 +131,7 @@ def main() -> int:
                         f"overheat={overheat_cap:.3f}/{overheat_hi_cap:.3f}",
                         flush=True,
                     )
-                    result, trades = apply_overlay(
+                    result, trades = apply_stressbond_overlay(
                         prices=prices,
                         selected=selected,
                         proxy=proxy,
@@ -182,102 +152,68 @@ def main() -> int:
                         f"_vg{int(round(vg_cap * 1000)):03d}"
                         f"_oc{int(round(overheat_cap * 1000)):03d}"
                         f"_oh{int(round(overheat_hi_cap * 1000)):03d}"
-                        f"__stressbond_511260_vr90_vb-1"
+                        f"__stressbond_{overlay_context['treasury_code']}"
+                        f"_vr{int(round(float(overlay_context['ratio_cut']) * 100)):02d}"
+                        f"_vb{int(round((float(overlay_context['breadth_cut']) + 0.02) * 100)):02d}"
                     )
-                    summary = summarize(result, trades, selected)
-                    summary["strategy"] = strategy
-                    summary["risk_cap"] = risk_cap
-                    summary["vg_cap"] = vg_cap
-                    summary["overheat_cap"] = overheat_cap
-                    summary["overheat_hi_cap"] = overheat_hi_cap
-                    rows.append(summary)
-                    nav_compare[f"{strategy}_nav"] = result["nav"]
-                    descriptions[strategy] = (
-                        "围绕当前最接近有效的新候选继续细化："
-                        f"风险仓上限 {risk_cap:.1%}，弱量能上限 {vg_cap:.1%}，"
-                        f"过热/极热上限 {overheat_cap:.1%}/{overheat_hi_cap:.1%}。"
+                    append_variant_result(
+                        rows,
+                        nav_compare,
+                        descriptions,
+                        strategy=strategy,
+                        result=result,
+                        summary=summarize(result, trades, selected),
+                        description=(
+                            f"围绕当前 {treasury_row['name']} 最接近有效的新候选继续细化："
+                            f"风险仓上限 {risk_cap:.1%}，弱量能上限 {vg_cap:.1%}，"
+                            f"过热/极热上限 {overheat_cap:.1%}/{overheat_hi_cap:.1%}。"
+                        ),
+                        extra_fields={
+                            "risk_cap": risk_cap,
+                            "vg_cap": vg_cap,
+                            "overheat_cap": overheat_cap,
+                            "overheat_hi_cap": overheat_hi_cap,
+                        },
                     )
 
-    summary_df = pd.DataFrame(rows)
-    summary_df["annualized_diff"] = summary_df["annualized_return"] - float(baseline_summary["annualized_return"])
-    summary_df["sharpe_diff"] = summary_df["sharpe_rf0"] - float(baseline_summary["sharpe_rf0"])
-    summary_df["max_drawdown_integral_diff"] = summary_df["max_drawdown_integral"] - float(baseline_summary["max_drawdown_integral"])
-    summary_df["is_valid_change"] = (
-        (summary_df["strategy"] != str(overlay_context["strategy"]))
-        & (summary_df["annualized_return"] >= float(baseline_summary["annualized_return"]) - METRIC_TOLERANCE)
-        & (summary_df["sharpe_rf0"] >= float(baseline_summary["sharpe_rf0"]) - METRIC_TOLERANCE)
-        & (summary_df["max_drawdown_integral"] <= float(baseline_summary["max_drawdown_integral"]) + METRIC_TOLERANCE)
-        & (
-            (summary_df["annualized_return"] > float(baseline_summary["annualized_return"]) + METRIC_TOLERANCE)
-            | (summary_df["sharpe_rf0"] > float(baseline_summary["sharpe_rf0"]) + METRIC_TOLERANCE)
-            | (summary_df["max_drawdown_integral"] < float(baseline_summary["max_drawdown_integral"]) - METRIC_TOLERANCE)
-        )
+    summary_df, better_ranked_df = extract_ranked_valid_improvements(
+        rows,
+        baseline_summary,
+        metric_tolerance=METRIC_TOLERANCE,
+        strategy_name=str(overlay_context["strategy"]),
     )
-    summary_df = summary_df.sort_values(
-        ["is_valid_change", "annualized_return", "sharpe_rf0", "max_drawdown_integral"],
-        ascending=[False, False, False, True],
-    )
-    write_dataframe_csv_atomic(summary_df, SUMMARY_PATH, index=False)
-    write_dataframe_csv_atomic(nav_compare, COMPARE_PATH)
-
-    valid_df = summary_df[summary_df["is_valid_change"]].copy()
-    better_ranked_df = rank_valid_improvements(valid_df, pd.Series(baseline_summary))
-    write_json_atomic(
-        BEST_PATH,
-        {
-            "baseline": baseline_summary,
-            "valid_improvements": better_ranked_df.to_dict(orient="records"),
-            "descriptions": descriptions,
-        },
+    plot_lines = [
+        (f"{overlay_context['strategy']}_nav", "Baseline", 2.2),
+        (f"{market_context['strategy']}__edge_rc180_vg290_oc070_oh030__stressbond_{overlay_context['treasury_code']}_vr89_vb00_nav", "Edge RC180", 1.8),
+        (f"{market_context['strategy']}__edge_rc185_vg290_oc070_oh030__stressbond_{overlay_context['treasury_code']}_vr89_vb00_nav", "Edge RC185", 1.8),
+        (f"{market_context['strategy']}__edge_rc188_vg295_oc072_oh032__stressbond_{overlay_context['treasury_code']}_vr89_vb00_nav", "Edge RC188", 1.8),
+    ]
+    available_plot_lines = filter_available_plot_lines(nav_compare, plot_lines)
+    save_plot_and_print_baseline_preview(
+        OUTPUT_DIR,
+        summary_df,
+        nav_compare,
+        baseline_summary=baseline_summary,
+        columns=build_baseline_preview_columns(
+            ["strategy", "risk_cap", "vg_cap", "overheat_cap", "overheat_hi_cap"]
+        ),
+        plot_filename="comparison.png",
+        title="Stressbond Edge Refine Comparison",
+        lines=available_plot_lines,
+        head=20,
     )
 
-    print("Baseline:")
-    print(pd.Series(baseline_summary).to_string())
-    print("\nTop candidates:")
-    print(
-        summary_df[
-            [
-                "strategy",
-                "risk_cap",
-                "vg_cap",
-                "overheat_cap",
-                "overheat_hi_cap",
-                "annualized_return",
-                "sharpe_rf0",
-                "max_drawdown_integral",
-                "annualized_diff",
-                "sharpe_diff",
-                "max_drawdown_integral_diff",
-                "is_valid_change",
-            ]
-        ]
-        .head(20)
-        .to_string(index=False)
+    save_best_payload_and_notify_ranked_webhook(
+        args,
+        best_path=BEST_PATH,
+        notify_state_path=NOTIFY_STATE_PATH,
+        baseline_summary=baseline_summary,
+        improvements_df=better_ranked_df,
+        descriptions=descriptions,
+        metric_tolerance=METRIC_TOLERANCE,
+        default_webhook=DEFAULT_FEISHU_WEBHOOK,
+        send_fn=send_improvement_notification,
     )
-
-    notify_state = load_notify_state()
-    notify_df = better_ranked_df.copy()
-    if notify_state is not None:
-        previous_summary = notify_state.get("summary", {})
-        notify_df = notify_df[
-            (notify_df["annualized_return"] >= float(previous_summary["annualized_return"]) - METRIC_TOLERANCE)
-            & (notify_df["sharpe_rf0"] >= float(previous_summary["sharpe_rf0"]) - METRIC_TOLERANCE)
-            & (notify_df["max_drawdown_integral"] <= float(previous_summary["max_drawdown_integral"]) + METRIC_TOLERANCE)
-            & (
-                (notify_df["annualized_return"] > float(previous_summary["annualized_return"]) + METRIC_TOLERANCE)
-                | (notify_df["sharpe_rf0"] > float(previous_summary["sharpe_rf0"]) + METRIC_TOLERANCE)
-                | (notify_df["max_drawdown_integral"] < float(previous_summary["max_drawdown_integral"]) - METRIC_TOLERANCE)
-            )
-        ].copy()
-        notify_df = rank_valid_improvements(notify_df, pd.Series(previous_summary))
-
-    if args.notify and not notify_df.empty:
-        best = notify_df.iloc[0]
-        webhook_url = args.webhook_url or os.getenv("DAILY_MONITOR_WEBHOOK_URL", DEFAULT_FEISHU_WEBHOOK)
-        description = descriptions[str(best["strategy"])]
-        send_improvement_notification(baseline_summary, str(best["strategy"]), best.to_dict(), description, webhook_url)
-        save_notify_state(str(best["strategy"]), best.to_dict(), description)
-        print(f"\nWebhook notified for {best['strategy']}")
 
     return 0
 

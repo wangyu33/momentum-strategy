@@ -31,6 +31,8 @@
   - `compare_tail_risk_bond_overlay.py`
   - `compare_defensive_persistence.py`
   - `compare_candidate_pool_additions.py`
+  - `candidate_pool_common.py`
+  - `pool_change_common.py`
   - `compare_strategy_refinements.py`
   - `compare_china_internet_guards.py`
   - `compare_resource_guards.py`
@@ -39,6 +41,7 @@
   - `validate_strategy_outputs.py`
   这批文件里有些会被正式入口、巡检脚本或活跃研究脚本直接 import。
   它们更多承担复用逻辑、专项回测或回归校验职责，不建议继续往 `archive/experiments/` 挪，除非先解除依赖。
+  其中候选池相关的 ETF 常量、基础池代码和阈值双动量基线 helper，当前优先下沉到 `candidate_pool_common.py`；候选池加减替换与默认正式策略评估外壳，则优先下沉到 `pool_change_common.py`。能直接依赖这些公共层的脚本，不要再为了拿常量或通用外壳去 import `compare_candidate_pool_additions.py` / `compare_current_best_pool_additions.py` 这类研究入口。
 
 - 历史归档
   - `archive/experiments/`
@@ -57,6 +60,10 @@
   - 最新确认持仓
   - 今日目标持仓
   - 根据今日盘中/盘后数据是否需要交易
+
+- `official_baseline.py`
+  正式官方基线净值锚点层。`run_backtest.py` 以及部分“拿当前正式基线做对照”的研究脚本，会先对齐 `output/reference/official_baseline_nav.csv`，再从锚点后的最后一个确认日继续按 `strategy_return` 递推。
+  这层的目的不是改研究策略本身，而是防止本地历史数据口径、旧实验参数或缓存漂移把正式链路的历史峰值 / 最大回撤重算坏。
 
 ## 指标口径
 
@@ -84,6 +91,10 @@
 - `compare_*.py`
   是研究脚本或研究支撑模块。真正作为入口使用的脚本通常会把结果写到 `output/research/<experiment_name>/`，不应覆盖正式基线。
 
+- 如果研究脚本的 baseline 明确写的是“当前正式基线”或 `base_pool`
+  默认应走 `official_baseline.py` 的锚点逻辑。
+  这样历史峰值会稳定保持在已确认的正式链路上，而不是跟着本地临时数据源或旧版参数漂移。
+
 - `analyze_*.py` / `plot_*.py`
   对已有回测结果做归因、回撤拆解和图表分析。
 
@@ -93,10 +104,15 @@
 
 `baseline_cf60top2`
 
+其中：
+
+- `baseline_cf60top2` 是当前代码里的正式策略标识
+- `confirm60_top2` 是这条基线更口语化的简称，强调它的 `60` 日前二确认信号约束
+
 可以把它理解成 4 层规则叠加：
 
 1. 底层信号选择
-   先算风险资产的原始 `25` 日动量，再对“近 5 日涨得过陡”的标的做一层 `slope_085` 惩罚；同时要求候选标的也进入风险池 `60` 日动量前 `2` 名，最后再按修正后的质量分数选第一名。
+   先算风险资产的原始 `25` 日动量，再对“近 5 日涨得过陡”的标的做一层 `slope_085` 惩罚；同时要求候选标的进入风险池 `60` 日动量前 `2` 名，最后再按修正后的质量分数选第一名。
    - 原始动量：`price / price.shift(25) - 1`
    - 质量分数：`raw_momentum - 0.85 * clip(ret5 - raw_momentum / 5, lower=0)`
    - 中期确认：风险池 `60` 日动量前 `2` 名才允许参与当天风险信号竞争
@@ -185,7 +201,7 @@
 
 按日频回测时，核心流程是：
 
-1. 拉取候选池历史价格，并对 ETF 现金分红做本地前复权处理。
+1. 拉取候选池历史价格，并对 ETF 现金分红、拆分/折算类结构性断点做本地前复权处理。
 2. 计算风险池里每只 ETF 的原始 `25` 日动量。
 3. 用 `slope_085` 质量分数在风险池里选出当前主信号。
 4. 根据主信号原始动量强弱，先决定“偏进攻”还是“偏防守”的核心仓位框架。
@@ -420,7 +436,7 @@ source .venv/bin/activate
 - momentum board：工作日 `15:10`
 - backfill：工作日 `15:20`
 
-注意：LaunchAgent 当前实际调用的是系统 `/usr/bin/python3`，但它运行在稳定版目录，并以同步后的项目文件为准。
+注意：LaunchAgent 当前实际调用的是稳定运行版目录下的 `~/.venv`，即 `~/Library/Caches/wy_test_runtime/.venv/bin/python`，而不是系统 `/usr/bin/python3`。
 
 ### 3. 改动如何上线到定时任务
 
@@ -436,6 +452,8 @@ source .venv/bin/activate
 这个脚本会：
 
 - 把编辑版同步到 `~/Library/Caches/wy_test_runtime`
+- 自动创建 / 复用 `~/Library/Caches/wy_test_runtime/.venv`
+- 按 `momentum_backtest/runtime-requirements.txt` 安装运行时依赖
 - 运行 `validate_strategy_outputs.py`
 - 重写并重载 LaunchAgent
 - 补齐运行时日志路径
@@ -787,8 +805,10 @@ source .venv/bin/activate
 当前已经归档的历史脚本在 `archive/experiments/`，例如：
 
 - `archive/experiments/compare_lookback_range.py`
+- `archive/experiments/compare_dynamic_thresholds.py`
 - `archive/experiments/compare_multihorizon_combo.py`
 - `archive/experiments/compare_momentum_quality_variants.py`
+- `archive/experiments/compare_strategy_direction_bakeoff.py`
 - `archive/experiments/compare_cash_overlay_candidates.py`
 - `archive/experiments/compare_defensive_bucket_blends.py`
 - `archive/experiments/compare_defensive_trigger_refinements.py`

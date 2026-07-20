@@ -24,8 +24,8 @@ from run_backtest import (
     write_dataframe_csv_atomic,
 )
 from official_candidate_runner import load_official_research_context, summarize_candidate
-from compare_goal_optimizations import build_parametrized_hs300_trend_filter
-from compare_hs300_regime_fixes import run_target_weights_strategy
+from goal_optimization_common import build_parametrized_hs300_trend_filter
+from hs300_regime_common import run_target_weights_strategy
 
 OUTPUT_DIR = Path('momentum_backtest/output/research/slope_combo_replacements')
 

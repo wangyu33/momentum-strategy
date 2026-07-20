@@ -19,6 +19,11 @@ import pandas as pd
 import official_strategy_core as official_strategy_core_module
 import run_backtest as run_backtest_module
 
+try:
+    from .official_baseline import apply_official_baseline_nav_anchor
+except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
+
 from run_backtest import (
     CORE_OUTPUT_DIR,
     DEFAULT_HISTORY_START,
@@ -139,6 +144,7 @@ def main() -> None:
 
     baseline_params = build_default_strategy_params()
     baseline_result, baseline_trades = run_default_strategy_with_params(prices, selected, baseline_params)
+    baseline_result = apply_official_baseline_nav_anchor(baseline_result)
     baseline_zone_mask = baseline_result["effective_momentum"].gt(0) & baseline_result["effective_momentum"].le(0.05)
 
     for variant in variants:
@@ -154,6 +160,8 @@ def main() -> None:
         finally:
             run_backtest_module.DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD = previous_run_threshold
             official_strategy_core_module.DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD = previous_core_threshold
+        if str(variant["name"]) == "baseline_step_05":
+            result = apply_official_baseline_nav_anchor(result)
         results[str(variant["name"])] = result
         summary = build_strategy_summary(result, trades, selected=selected, include_max_drawdown_integral=True)
 

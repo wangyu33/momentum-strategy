@@ -32,6 +32,7 @@ try:
         try_join_missing_candidate_histories,
         write_json_atomic,
     )
+    from .official_baseline import apply_official_baseline_nav_anchor
 except ImportError:
     from compare_hs300_regime_fixes import load_cached_data, summarize
     from compare_goal_optimizations import (
@@ -50,6 +51,7 @@ except ImportError:
         try_join_missing_candidate_histories,
         write_json_atomic,
     )
+    from official_baseline import apply_official_baseline_nav_anchor
 
 from run_backtest import (
     DEFAULT_BASELINE_DROP_CODES,
@@ -304,6 +306,7 @@ def main() -> int:
         fee_rate=args.fee_rate,
         slippage_rate=args.slippage_rate,
     )
+    baseline_result = apply_official_baseline_nav_anchor(baseline_result)
     baseline_summary = summarize(baseline_result, baseline_trades, selected)
     baseline_summary["strategy"] = baseline_name
     baseline_summary["proxy_kind"] = str(current_params["proxy_kind"])

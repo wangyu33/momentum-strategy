@@ -16,6 +16,11 @@ configure_matplotlib_env()
 
 import pandas as pd
 
+try:
+    from .official_baseline import apply_official_baseline_nav_anchor
+except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
+
 from run_backtest import (
     build_default_strategy_params,
     build_strategy_summary,
@@ -23,7 +28,7 @@ from run_backtest import (
     run_default_strategy_with_params,
     write_dataframe_csv_atomic,
 )
-from compare_market_proxy_variants import build_proxy_catalog
+from market_proxy_common import build_proxy_catalog
 
 OUTPUT_DIR = Path("momentum_backtest/output/research/top2_riskcap_candidates")
 
@@ -97,6 +102,7 @@ def main() -> int:
         params=base_params,
         market_proxy=effective_proxy,
     )
+    baseline_result = apply_official_baseline_nav_anchor(baseline_result)
     baseline_summary = summarize_variant(
         baseline_result,
         baseline_trades,

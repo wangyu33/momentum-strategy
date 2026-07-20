@@ -14,62 +14,66 @@ prepare_local_imports(__file__, include_module_dir=False)
 import pandas as pd
 
 try:
-    from .compare_hs300_regime_fixes import summarize
-    from .compare_candidate_pool_additions import (
+    from .candidate_pool_common import (
+        ETF_159930,
+        ETF_159985,
+        ETF_508000,
         ETF_510500,
         ETF_510880,
         ETF_510900,
+        ETF_510410,
         ETF_511090,
         ETF_511260,
         ETF_511380,
         ETF_512480,
         ETF_513030,
         ETF_513080,
+        ETF_513300,
+        ETF_513660,
         ETF_515790,
+        ETF_515220,
         ETF_588000,
     )
-    from .compare_goal_optimizations import load_market_volume_proxy
+    from .goal_optimization_common import load_market_volume_proxy
+    from .hs300_regime_common import summarize
+    from .pool_change_common import apply_pool_change, evaluate_pool
 except ImportError:
-    from compare_hs300_regime_fixes import summarize
-    from compare_candidate_pool_additions import (
+    from candidate_pool_common import (
+        ETF_159930,
+        ETF_159985,
+        ETF_508000,
         ETF_510500,
         ETF_510880,
         ETF_510900,
+        ETF_510410,
         ETF_511090,
         ETF_511260,
         ETF_511380,
         ETF_512480,
         ETF_513030,
         ETF_513080,
+        ETF_513300,
+        ETF_513660,
         ETF_515790,
+        ETF_515220,
         ETF_588000,
     )
-    from compare_goal_optimizations import load_market_volume_proxy
+    from goal_optimization_common import load_market_volume_proxy
+    from hs300_regime_common import summarize
+    from pool_change_common import apply_pool_change, evaluate_pool
 
 from run_backtest import (
     DEFAULT_BASELINE_DROP_CODES,
     DEFAULT_FEE_RATE,
     DEFAULT_SLIPPAGE_RATE,
-    DEFENSIVE_CODES,
     RESEARCH_OUTPUT_DIR,
-    RISK_CODES,
-    build_default_strategy_params,
     fetch_histories,
     load_default_strategy_backtest_pool,
-    run_default_strategy_with_params,
     write_dataframe_csv_atomic,
 )
 
 
 OUTPUT_DIR = RESEARCH_OUTPUT_DIR / "current_best_pool_additions"
-
-ETF_159985 = {"theme": "豆粕", "code": "159985", "name": "豆粕ETF", "sina_symbol": "sz159985"}
-ETF_508000 = {"theme": "REITs", "code": "508000", "name": "REITsETF", "sina_symbol": "sh508000"}
-ETF_515220 = {"theme": "煤炭", "code": "515220", "name": "煤炭ETF", "sina_symbol": "sh515220"}
-ETF_159930 = {"theme": "能源", "code": "159930", "name": "能源ETF", "sina_symbol": "sz159930"}
-ETF_510410 = {"theme": "资源", "code": "510410", "name": "资源ETF", "sina_symbol": "sh510410"}
-ETF_513300 = {"theme": "海外红利", "code": "513300", "name": "海外红利ETF", "sina_symbol": "sh513300"}
-ETF_513660 = {"theme": "港股红利低波", "code": "513660", "name": "港股红利低波ETF", "sina_symbol": "sh513660"}
 
 POOL_CHANGES = [
     {"pool": "base_pool", "kind": "base"},
@@ -119,75 +123,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def evaluate_pool(
-    selected: pd.DataFrame,
-    prices: pd.DataFrame,
-    market_proxy: pd.DataFrame,
-    drop_codes: list[str],
-    risk_codes: list[str],
-    defensive_codes: list[str],
-    fee_rate: float,
-    slippage_rate: float,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    return run_default_strategy_with_params(
-        prices=prices,
-        selected=selected,
-        params=build_default_strategy_params(
-            drop_codes=drop_codes,
-            risk_codes=risk_codes,
-            defensive_codes=defensive_codes,
-        ),
-        fee_rate=fee_rate,
-        slippage_rate=slippage_rate,
-        market_proxy=market_proxy,
-    )
-
-
-def apply_pool_change(
-    base_selected: pd.DataFrame,
-    base_drop_codes: list[str],
-    change: dict[str, object],
-) -> tuple[pd.DataFrame, list[str], list[str], list[str]]:
-    selected = base_selected.copy()
-    risk_codes = [code for code in RISK_CODES if code not in base_drop_codes]
-    defensive_codes = [code for code in DEFENSIVE_CODES if code not in base_drop_codes]
-    effective_drop_codes = list(base_drop_codes)
-
-    drop_codes = [str(code) for code in change.get("drop_codes", [])]
-    if drop_codes:
-        selected = selected[~selected["code"].astype(str).isin(drop_codes)].reset_index(drop=True)
-        risk_codes = [code for code in risk_codes if code not in drop_codes]
-        defensive_codes = [code for code in defensive_codes if code not in drop_codes]
-
-    candidate = change.get("candidate")
-    candidate_kind = change.get("candidate_kind")
-    if candidate is not None:
-        selected = pd.concat([selected, pd.DataFrame([candidate])], ignore_index=True)
-        candidate_code = str(candidate["code"])
-        if candidate_code in effective_drop_codes:
-            effective_drop_codes = [code for code in effective_drop_codes if code != candidate_code]
-        if candidate_kind == "risk":
-            risk_codes.append(candidate_code)
-        elif candidate_kind == "defensive":
-            defensive_codes.append(candidate_code)
-
-    candidates = change.get("candidates", [])
-    for item in candidates:
-        selected = pd.concat([selected, pd.DataFrame([item])], ignore_index=True)
-        candidate_code = str(item["code"])
-        if candidate_code in effective_drop_codes:
-            effective_drop_codes = [code for code in effective_drop_codes if code != candidate_code]
-        if candidate_kind == "risk":
-            risk_codes.append(candidate_code)
-        elif candidate_kind == "defensive":
-            defensive_codes.append(candidate_code)
-
-    selected = selected.drop_duplicates(subset=["code"], keep="last").reset_index(drop=True)
-    risk_codes = list(dict.fromkeys(risk_codes))
-    defensive_codes = list(dict.fromkeys(defensive_codes))
-    return selected, risk_codes, defensive_codes, effective_drop_codes
-
-
 def main() -> int:
     args = parse_args()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -198,13 +133,37 @@ def main() -> int:
     pool_filters = set(args.pools)
     changes_to_run = [change for change in POOL_CHANGES if not pool_filters or str(change["pool"]) in pool_filters]
 
+    prepared_changes: list[dict[str, object]] = []
+    union_selected_frames: list[pd.DataFrame] = []
+    for change in changes_to_run:
+        selected, risk_codes, defensive_codes, effective_drop_codes = apply_pool_change(base_selected, base_drop_codes, change)
+        prepared_changes.append(
+            {
+                "change": change,
+                "selected": selected,
+                "risk_codes": risk_codes,
+                "defensive_codes": defensive_codes,
+                "effective_drop_codes": effective_drop_codes,
+            }
+        )
+        union_selected_frames.append(selected)
+
+    union_selected = pd.concat(union_selected_frames, ignore_index=True).drop_duplicates(subset=["code"], keep="last")
+    union_prices = fetch_histories(union_selected, years=args.years)
+
     rows: list[dict[str, object]] = []
     nav_compare = pd.DataFrame()
 
-    for change in changes_to_run:
+    for prepared in prepared_changes:
+        change = dict(prepared["change"])
         pool_name = str(change["pool"])
-        selected, risk_codes, defensive_codes, effective_drop_codes = apply_pool_change(base_selected, base_drop_codes, change)
-        prices = fetch_histories(selected, years=args.years)
+        selected = pd.DataFrame(prepared["selected"]).copy()
+        risk_codes = list(prepared["risk_codes"])
+        defensive_codes = list(prepared["defensive_codes"])
+        effective_drop_codes = list(prepared["effective_drop_codes"])
+        selected_codes = selected["code"].astype(str).tolist()
+        prices = union_prices.reindex(columns=selected_codes).copy()
+        prices = prices.dropna(how="any")
         prices = prices.loc[prices.index >= pd.Timestamp(args.start_date)].copy()
         result, trades = evaluate_pool(
             selected=selected,
@@ -215,6 +174,7 @@ def main() -> int:
             defensive_codes=defensive_codes,
             fee_rate=args.fee_rate,
             slippage_rate=args.slippage_rate,
+            use_official_baseline_anchor=(pool_name == "base_pool"),
         )
         row = summarize(result, trades, selected)
         row["pool"] = pool_name

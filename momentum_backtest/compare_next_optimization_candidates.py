@@ -16,6 +16,11 @@ configure_matplotlib_env()
 import matplotlib
 import pandas as pd
 
+try:
+    from .official_baseline import apply_official_baseline_nav_anchor
+except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
+
 from run_backtest import (
     DEFAULT_FEE_RATE,
     DEFAULT_SLIPPAGE_RATE,
@@ -113,6 +118,7 @@ def main() -> int:
             slippage_rate=args.slippage_rate,
         )
         if strategy_name == "baseline":
+            result = apply_official_baseline_nav_anchor(result)
             baseline_result = result
             baseline_trades = trades
 

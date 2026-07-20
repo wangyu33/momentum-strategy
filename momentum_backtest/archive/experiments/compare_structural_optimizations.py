@@ -4,10 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
+MOMENTUM_DIR = Path(__file__).resolve().parents[2]
+if str(MOMENTUM_DIR) not in sys.path:
+    sys.path.insert(0, str(MOMENTUM_DIR))
+
 try:
-    from ..runtime_env import prepare_local_imports
+    from ...runtime_env import prepare_local_imports
 except ImportError:
     from runtime_env import prepare_local_imports
 
@@ -15,23 +20,31 @@ prepare_local_imports(__file__)
 
 import pandas as pd
 
-from compare_goal_optimizations import load_market_volume_proxy
-from compare_hs300_regime_fixes import load_cached_data, summarize
-from run_backtest import (
+from archive_data_loaders import build_archive_flat_output_dir, load_selected_prices
+from variant_compare_helpers import (
+    append_variant_result,
+    build_compare_frame,
+    finalize_baseline_diff_summary,
+    save_plot_and_print_variant_compare_outputs,
+)
+try:
+    from ...official_baseline import apply_official_baseline_nav_anchor
+except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
+
+from goal_optimization_common import load_market_volume_proxy
+from hs300_regime_common import summarize
+from archive_strategy_common import (
     DEFAULT_FEE_RATE,
     DEFAULT_SLIPPAGE_RATE,
     build_default_strategy_params,
-    ensure_output_dirs,
     fetch_histories,
     load_default_strategy_backtest_pool,
     run_default_strategy_with_params,
-    write_dataframe_csv_atomic,
 )
 
 
-OUTPUT_DIR = Path("momentum_backtest/output/research/archive_flat/compare_structural_optimizations")
-SUMMARY_PATH = OUTPUT_DIR / "summary.csv"
-NAV_COMPARE_PATH = OUTPUT_DIR / "nav_compare.csv"
+OUTPUT_DIR = build_archive_flat_output_dir("compare_structural_optimizations")
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,18 +54,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--slippage-rate", type=float, default=DEFAULT_SLIPPAGE_RATE, help="单边滑点率。")
     parser.add_argument("--refresh", action="store_true", help="重新抓取价格和市场代理数据。")
     return parser.parse_args()
-
-
-def load_prices(selected: pd.DataFrame, years: int, refresh: bool) -> pd.DataFrame:
-    if refresh:
-        return fetch_histories(selected, years=years)
-
-    _, cached_prices = load_cached_data()
-    start_ts = cached_prices.index.max() - pd.DateOffset(years=years)
-    prices = cached_prices.loc[cached_prices.index >= start_ts].copy()
-    selected_codes = selected["code"].astype(str).tolist()
-    prices = prices[[code for code in selected_codes if code in prices.columns]].copy()
-    return prices
 
 
 def build_variant_rows(
@@ -91,9 +92,7 @@ def build_variant_rows(
     ]
 
     summary_rows: list[dict[str, object]] = []
-    nav_compare = pd.DataFrame(index=prices.index)
-    baseline_metrics: dict[str, float] | None = None
-
+    nav_compare = build_compare_frame(prices)
     for name, description, params, fill_residual_cash in variants:
         result, trades = run_default_strategy_with_params(
             prices=prices,
@@ -104,45 +103,51 @@ def build_variant_rows(
             market_proxy=market_proxy,
             fill_residual_cash_to_treasury=fill_residual_cash,
         )
-        summary = summarize(result, trades, selected)
-        summary["strategy"] = name
-        summary["description"] = description
-        summary["fill_residual_cash_to_treasury"] = fill_residual_cash
-        summary["volume_guard_cap"] = float(params["volume_guard_cap"])
-        summary["overheat_cap_mode"] = str(params.get("overheat_cap_mode", "step"))
+        if name == "baseline":
+            result = apply_official_baseline_nav_anchor(result)
+        append_variant_result(
+            summary_rows,
+            nav_compare,
+            None,
+            strategy=name,
+            result=result,
+            summary=summarize(result, trades, selected),
+            strategy_field="strategy",
+            nav_column=f"{name}_nav",
+            extra_fields={
+                "description": description,
+                "fill_residual_cash_to_treasury": fill_residual_cash,
+                "volume_guard_cap": float(params["volume_guard_cap"]),
+                "overheat_cap_mode": str(params.get("overheat_cap_mode", "step")),
+            },
+        )
 
-        if baseline_metrics is None:
-            baseline_metrics = {
-                "annualized_return": float(summary["annualized_return"]),
-                "sharpe_rf0": float(summary["sharpe_rf0"]),
-                "max_drawdown": float(summary["max_drawdown"]),
-                "max_drawdown_integral": float(summary["max_drawdown_integral"]),
-            }
-            summary["annualized_diff"] = 0.0
-            summary["sharpe_diff"] = 0.0
-            summary["max_drawdown_diff"] = 0.0
-            summary["max_drawdown_integral_diff"] = 0.0
-        else:
-            summary["annualized_diff"] = float(summary["annualized_return"]) - baseline_metrics["annualized_return"]
-            summary["sharpe_diff"] = float(summary["sharpe_rf0"]) - baseline_metrics["sharpe_rf0"]
-            summary["max_drawdown_diff"] = float(summary["max_drawdown"]) - baseline_metrics["max_drawdown"]
-            summary["max_drawdown_integral_diff"] = (
-                float(summary["max_drawdown_integral"]) - baseline_metrics["max_drawdown_integral"]
-            )
-
-        nav_compare[f"{name}_nav"] = result["nav"]
-        summary_rows.append(summary)
-
-    return pd.DataFrame(summary_rows), nav_compare
+    return (
+        finalize_baseline_diff_summary(
+            summary_rows,
+            baseline_field="strategy",
+            baseline_value="baseline",
+            metric_mappings=(
+                ("annualized_return", "annualized_diff"),
+                ("sharpe_rf0", "sharpe_diff"),
+                ("max_drawdown", "max_drawdown_diff"),
+                ("max_drawdown_integral", "max_drawdown_integral_diff"),
+            ),
+        ),
+        nav_compare,
+    )
 
 
 def main() -> int:
     args = parse_args()
-    ensure_output_dirs()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     selected = load_default_strategy_backtest_pool()
-    prices = load_prices(selected, years=args.years, refresh=args.refresh)
+    prices = load_selected_prices(
+        selected,
+        years=args.years,
+        refresh=args.refresh,
+        fetch_fn=fetch_histories,
+    )
     market_proxy = load_market_volume_proxy(years=args.years, refresh=args.refresh)
 
     summary_df, nav_compare = build_variant_rows(
@@ -152,12 +157,18 @@ def main() -> int:
         fee_rate=args.fee_rate,
         slippage_rate=args.slippage_rate,
     )
-    write_dataframe_csv_atomic(summary_df, SUMMARY_PATH, index=False)
-    write_dataframe_csv_atomic(nav_compare, NAV_COMPARE_PATH)
-
-    print(summary_df.to_string(index=False))
-    print(f"\nsummary saved to {SUMMARY_PATH}")
-    print(f"nav compare saved to {NAV_COMPARE_PATH}")
+    save_plot_and_print_variant_compare_outputs(
+        OUTPUT_DIR,
+        summary_df,
+        nav_compare,
+        plot_filename="comparison.png",
+        title="Structural Optimizations Comparison",
+        lines=(
+            ("baseline_nav", "Baseline", 2.2),
+            ("step1_split_weak_and_stress_nav", "Step 1", 1.8),
+            ("step2_split_and_smooth_overheat_nav", "Step 2", 1.8),
+        ),
+    )
     return 0
 
 

@@ -24,7 +24,7 @@ import akshare as ak
 import pandas as pd
 
 try:
-    from .compare_candidate_pool_additions import ETF_513050
+    from .candidate_pool_common import ETF_513050
     from .compare_resource_guards import RESOURCE_ETF
     from .run_backtest import (
         CORE_OUTPUT_DIR,
@@ -66,7 +66,7 @@ try:
         format_trade_message,
     )
 except ImportError:
-    from compare_candidate_pool_additions import ETF_513050
+    from candidate_pool_common import ETF_513050
     from compare_resource_guards import RESOURCE_ETF
     from run_backtest import (
         CORE_OUTPUT_DIR,

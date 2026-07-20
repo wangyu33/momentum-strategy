@@ -5,10 +5,15 @@ from __future__ import annotations
 
 import argparse
 import math
+import sys
 from pathlib import Path
 
+MOMENTUM_DIR = Path(__file__).resolve().parents[2]
+if str(MOMENTUM_DIR) not in sys.path:
+    sys.path.insert(0, str(MOMENTUM_DIR))
+
 try:
-    from ..runtime_env import prepare_local_imports
+    from ...runtime_env import prepare_local_imports
 except ImportError:
     from runtime_env import prepare_local_imports
 
@@ -16,11 +21,25 @@ prepare_local_imports(__file__)
 
 import pandas as pd
 
-from compare_defensive_persistence import build_persistent_mask
-from compare_goal_optimizations import build_parametrized_hs300_trend_filter, load_market_volume_proxy
-from compare_hs300_regime_fixes import load_cached_data, run_target_weights_strategy, summarize
-from compare_market_proxy_variants import build_proxy_catalog
-from run_backtest import (
+from archive_data_loaders import build_archive_flat_output_dir, load_named_market_proxy, load_selected_prices
+from overlay_strategy_helpers import apply_persistent_market_stress_treasury_cap, apply_risk_cap
+from variant_compare_helpers import (
+    append_variant_result,
+    build_compare_frame,
+    build_summary_frame,
+    filter_available_plot_lines,
+    finalize_baseline_diff_summary,
+    save_plot_and_print_summary_preview,
+)
+try:
+    from ...official_baseline import apply_official_baseline_nav_anchor
+except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
+
+from defensive_persistence_common import build_persistent_mask
+from goal_optimization_common import build_parametrized_hs300_trend_filter
+from hs300_regime_common import run_target_weights_strategy, summarize
+from archive_strategy_common import (
     DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD,
     DEFAULT_FEE_RATE,
     DEFAULT_LOOKBACK,
@@ -34,16 +53,12 @@ from run_backtest import (
     DEFAULT_WEAK_TREND_DEFENSIVE_WEIGHT,
     RISK_CODES,
     build_default_strategy_params,
-    ensure_output_dirs,
     fetch_histories,
     load_default_strategy_backtest_pool,
-    write_dataframe_csv_atomic,
 )
 
 
-OUTPUT_DIR = Path("momentum_backtest/output/research/archive_flat/compare_momentum_quality_variants")
-SUMMARY_PATH = OUTPUT_DIR / "summary.csv"
-COMPARE_PATH = OUTPUT_DIR / "nav_compare.csv"
+OUTPUT_DIR = build_archive_flat_output_dir("compare_momentum_quality_variants")
 
 
 def parse_args() -> argparse.Namespace:
@@ -270,15 +285,12 @@ def build_base_target_weights_quality(
         & (mixed_momentum <= float(params["volume_guard_momentum_ceiling"]))
     ).fillna(False)
 
-    capped_target_weights = mixed_target_weights.copy()
-    weak_cap = float(params["volume_guard_cap"])
-    weak_scale_mask = volume_weak_mask & (row_risk_weight > weak_cap)
-    if weak_scale_mask.any():
-        scale = pd.Series(1.0, index=prices.index, dtype="float64")
-        scale.loc[weak_scale_mask] = weak_cap / row_risk_weight.loc[weak_scale_mask]
-        capped_target_weights.loc[weak_scale_mask, risk_codes] = capped_target_weights.loc[weak_scale_mask, risk_codes].mul(
-            scale.loc[weak_scale_mask], axis=0
-        )
+    capped_target_weights = apply_risk_cap(
+        mixed_target_weights,
+        risk_budget_codes=risk_codes,
+        trigger_mask=volume_weak_mask,
+        risk_cap=float(params["volume_guard_cap"]),
+    )
 
     base_result, _ = run_target_weights_strategy(
         prices,
@@ -294,26 +306,24 @@ def build_base_target_weights_quality(
         & (base_result["drawdown"] >= float(params["overheat_drawdown_cut"]))
         & (mixed_momentum >= float(params["overheat_momentum_cut"]))
     )
-    if overheat_mask.any():
-        scale = pd.Series(1.0, index=prices.index, dtype="float64")
-        scale.loc[overheat_mask] = float(params["overheat_max_exposure"]) / risk_weight_after_weak_guard.loc[overheat_mask]
-        capped_target_weights.loc[overheat_mask, risk_codes] = capped_target_weights.loc[overheat_mask, risk_codes].mul(
-            scale.loc[overheat_mask], axis=0
-        )
+    capped_target_weights = apply_risk_cap(
+        capped_target_weights,
+        risk_budget_codes=risk_codes,
+        trigger_mask=overheat_mask,
+        risk_cap=float(params["overheat_max_exposure"]),
+    )
 
     overheat_high_mask = (
         (capped_target_weights[risk_codes].sum(axis=1) > float(params["overheat_high_max_exposure"]))
         & (base_result["drawdown"] >= float(params["overheat_drawdown_cut"]))
         & (mixed_momentum >= float(params["overheat_high_momentum_cut"]))
     )
-    if overheat_high_mask.any():
-        scale = pd.Series(1.0, index=prices.index, dtype="float64")
-        scale.loc[overheat_high_mask] = (
-            float(params["overheat_high_max_exposure"]) / capped_target_weights[risk_codes].sum(axis=1).loc[overheat_high_mask]
-        )
-        capped_target_weights.loc[overheat_high_mask, risk_codes] = capped_target_weights.loc[
-            overheat_high_mask, risk_codes
-        ].mul(scale.loc[overheat_high_mask], axis=0)
+    capped_target_weights = apply_risk_cap(
+        capped_target_weights,
+        risk_budget_codes=risk_codes,
+        trigger_mask=overheat_high_mask,
+        risk_cap=float(params["overheat_high_max_exposure"]),
+    )
 
     return capped_target_weights, mixed_momentum, base_result
 
@@ -342,52 +352,41 @@ def run_quality_variant(
         leader_margin=leader_margin,
     )
     risk_codes = [code for code in RISK_CODES if code in prices.columns]
-    overlaid_weights = base_weights.copy()
-    proxy = proxy.reindex(prices.index).ffill()
-    row_risk_weight = base_weights[risk_codes].sum(axis=1)
-
-    raw_trigger = (
-        (proxy["market_amount_ratio_20_60"] < DEFAULT_STRESS_BOND_RATIO_CUT)
-        & (proxy["market_breadth_proxy"] < DEFAULT_STRESS_BOND_BREADTH_CUT)
-    ).fillna(False)
-    trigger_mask = build_persistent_mask(
-        raw_trigger,
+    overlaid_weights = apply_persistent_market_stress_treasury_cap(
+        base_weights,
+        proxy,
+        index=prices.index,
+        risk_budget_codes=risk_codes,
+        treasury_code=DEFAULT_STRESS_BOND_CODE,
+        ratio_cut=DEFAULT_STRESS_BOND_RATIO_CUT,
+        breadth_cut=DEFAULT_STRESS_BOND_BREADTH_CUT,
         enter_days=DEFAULT_STRESS_BOND_ENTER_DAYS,
         exit_days=DEFAULT_STRESS_BOND_EXIT_DAYS,
+        risk_cap=DEFAULT_STRESS_BOND_RISK_CAP,
+        persistence_builder=build_persistent_mask,
     )
-    scale_mask = trigger_mask & (row_risk_weight > DEFAULT_STRESS_BOND_RISK_CAP)
-    if scale_mask.any():
-        scale = pd.Series(1.0, index=prices.index, dtype="float64")
-        scale.loc[scale_mask] = DEFAULT_STRESS_BOND_RISK_CAP / row_risk_weight.loc[scale_mask]
-        overlaid_weights.loc[scale_mask, risk_codes] = overlaid_weights.loc[scale_mask, risk_codes].mul(
-            scale.loc[scale_mask], axis=0
-        )
-        moved_weight = row_risk_weight.loc[scale_mask] - DEFAULT_STRESS_BOND_RISK_CAP
-        overlaid_weights.loc[scale_mask, DEFAULT_STRESS_BOND_CODE] = overlaid_weights.loc[
-            scale_mask, DEFAULT_STRESS_BOND_CODE
-        ].add(moved_weight, fill_value=0.0)
 
     return run_target_weights_strategy(prices, selected, overlaid_weights, mixed_momentum, fee_rate, slippage_rate)
 
 
 def main() -> int:
     args = parse_args()
-    ensure_output_dirs()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     selected = load_default_strategy_backtest_pool()
-    if args.refresh:
-        prices = fetch_histories(selected, years=args.years)
-    else:
-        _, cached_prices = load_cached_data()
-        start_ts = cached_prices.index.max() - pd.DateOffset(years=args.years)
-        keep_codes = [code for code in selected["code"].astype(str) if code in cached_prices.columns]
-        prices = cached_prices.loc[cached_prices.index >= start_ts, keep_codes].copy()
+    prices = load_selected_prices(
+        selected,
+        years=args.years,
+        refresh=args.refresh,
+        fetch_fn=fetch_histories,
+    )
 
     params = build_default_strategy_params()
-    base_market_proxy = load_market_volume_proxy(years=args.years, refresh=args.refresh)
-    proxy_catalog = {item["name"]: item["proxy"] for item in build_proxy_catalog(base_market_proxy, prices)}
-    proxy = proxy_catalog["hybrid_breadth_blend"]
+    proxy = load_named_market_proxy(
+        prices,
+        years=args.years,
+        refresh=args.refresh,
+        proxy_kind="hybrid_breadth_blend",
+    )
 
     variants: list[dict[str, object]] = [{"strategy": "baseline_raw", "method": "raw"}]
     if args.slope_grid_only:
@@ -429,7 +428,7 @@ def main() -> int:
         )
 
     rows: list[dict[str, object]] = []
-    nav_compare = pd.DataFrame(index=prices.index)
+    nav_compare = build_compare_frame(prices)
     baseline_summary: dict[str, object] | None = None
 
     for spec in variants:
@@ -446,54 +445,77 @@ def main() -> int:
             slope_penalty=float(spec.get("slope_penalty", 0.0)),
             leader_margin=float(spec.get("leader_margin", 0.0)),
         )
-        summary = summarize(result, trades, selected)
-        summary["strategy"] = str(spec["strategy"])
-        summary["method"] = str(spec["method"])
-        summary["downvol_scale"] = float(spec.get("downvol_scale", 0.0))
-        summary["drawdown_penalty"] = float(spec.get("drawdown_penalty", 0.0))
-        summary["slope_penalty"] = float(spec.get("slope_penalty", 0.0))
-        summary["leader_margin"] = float(spec.get("leader_margin", 0.0))
-        rows.append(summary)
-        nav_compare[str(spec["strategy"])] = result["nav"]
+        if str(spec["strategy"]) == "baseline_raw":
+            result = apply_official_baseline_nav_anchor(result)
+        summary = append_variant_result(
+            rows,
+            nav_compare,
+            None,
+            strategy=str(spec["strategy"]),
+            result=result,
+            summary=summarize(result, trades, selected),
+            extra_fields={
+                "method": str(spec["method"]),
+                "downvol_scale": float(spec.get("downvol_scale", 0.0)),
+                "drawdown_penalty": float(spec.get("drawdown_penalty", 0.0)),
+                "slope_penalty": float(spec.get("slope_penalty", 0.0)),
+                "leader_margin": float(spec.get("leader_margin", 0.0)),
+            },
+            nav_column=str(spec["strategy"]),
+        )
         if str(spec["strategy"]) == "baseline_raw":
             baseline_summary = summary
 
     if baseline_summary is None:
         raise RuntimeError("missing baseline summary")
 
-    summary_df = pd.DataFrame(rows)
-    summary_df["annualized_diff"] = summary_df["annualized_return"] - float(baseline_summary["annualized_return"])
-    summary_df["sharpe_diff"] = summary_df["sharpe_rf0"] - float(baseline_summary["sharpe_rf0"])
-    summary_df["max_drawdown_integral_diff"] = (
-        summary_df["max_drawdown_integral"] - float(baseline_summary["max_drawdown_integral"])
+    summary_df = finalize_baseline_diff_summary(
+        rows,
+        baseline_field="strategy",
+        baseline_value="baseline_raw",
+        metric_mappings=(
+            ("annualized_return", "annualized_diff"),
+            ("sharpe_rf0", "sharpe_diff"),
+            ("max_drawdown_integral", "max_drawdown_integral_diff"),
+            ("max_drawdown", "max_drawdown_diff"),
+        ),
     )
-    summary_df["max_drawdown_diff"] = summary_df["max_drawdown"] - float(baseline_summary["max_drawdown"])
     summary_df["is_soft_improvement"] = (
         (summary_df["annualized_return"] >= float(baseline_summary["annualized_return"]) - 0.01)
         & (summary_df["max_drawdown_integral"] < float(baseline_summary["max_drawdown_integral"]) - 1e-12)
     )
-    summary_df = summary_df.sort_values(
-        ["is_soft_improvement", "max_drawdown_integral", "max_drawdown", "annualized_return"],
+    summary_df = build_summary_frame(
+        summary_df,
+        sort_by=["is_soft_improvement", "max_drawdown_integral", "max_drawdown", "annualized_return"],
         ascending=[False, True, False, False],
     )
-    write_dataframe_csv_atomic(summary_df, SUMMARY_PATH, index=False)
-    write_dataframe_csv_atomic(nav_compare, COMPARE_PATH)
-
-    print(
-        summary_df[
-            [
-                "strategy",
-                "annualized_return",
-                "sharpe_rf0",
-                "max_drawdown_integral",
-                "max_drawdown",
-                "annualized_diff",
-                "max_drawdown_integral_diff",
-                "max_drawdown_diff",
-                "trade_count",
-                "is_soft_improvement",
-            ]
-        ].to_string(index=False)
+    plot_lines = [
+        ("baseline_raw", "Baseline Raw", 2.2),
+        ("slope_080", "Slope 0.80", 1.8),
+        ("combo_light", "Combo Light", 1.8),
+        ("combo_margin", "Combo Margin", 1.8),
+        ("raw_margin", "Raw Margin", 1.8),
+    ]
+    available_plot_lines = filter_available_plot_lines(nav_compare, plot_lines)
+    save_plot_and_print_summary_preview(
+        OUTPUT_DIR,
+        summary_df,
+        nav_compare,
+        [
+            "strategy",
+            "annualized_return",
+            "sharpe_rf0",
+            "max_drawdown_integral",
+            "max_drawdown",
+            "annualized_diff",
+            "max_drawdown_integral_diff",
+            "max_drawdown_diff",
+            "trade_count",
+            "is_soft_improvement",
+        ],
+        plot_filename="comparison.png",
+        title="Momentum Quality Variant Comparison",
+        lines=available_plot_lines,
     )
     return 0
 

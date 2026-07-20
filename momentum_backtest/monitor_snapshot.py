@@ -336,9 +336,9 @@ def should_include_realtime_snapshot(session_label: str) -> bool:
 
 def build_market_volume_proxy_for_monitor(prices: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float | str | None]]:
     try:
-        from .compare_goal_optimizations import load_market_volume_proxy
+        from .goal_optimization_common import load_market_volume_proxy
     except ImportError:
-        from compare_goal_optimizations import load_market_volume_proxy
+        from goal_optimization_common import load_market_volume_proxy
 
     years = max(int(math.ceil((prices.index.max() - prices.index.min()).days / 365.25)) + 1, 15)
     proxy = load_market_volume_proxy(years=years, refresh=False).copy()

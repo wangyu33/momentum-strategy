@@ -1,0 +1,27 @@
+{
+  "strategy": "regime_mix_rm511580_rm513650_volume_guard_ag28_co27_vr91_vs90_vb01_vg30_cap08_hi04_dd02_rm06_vm16_oh25_ohh32__proxy_hybrid_breadth_blend_vr91_vs90_vb-1__edge_rc184_vg283_oc066_oh030__stressbond_511260_vr90_vb-1",
+  "summary": {
+    "total_return": 18.110113849330887,
+    "annualized_return": 0.2347060350675354,
+    "annualized_volatility": 0.20152011213456383,
+    "sharpe_rf0": 1.1646779697641885,
+    "max_drawdown": -0.2175205568349622,
+    "max_drawdown_integral": 39.147066788858126,
+    "trade_count": 1566,
+    "avg_exposure": 0.8128408355398647,
+    "latest_holding_code": "159941",
+    "latest_holding_theme": "纳指ETF",
+    "latest_holding_name": "纳指ETF广发",
+    "latest_momentum": 0.11705237513046125,
+    "latest_exposure": 1.0,
+    "risk_cap": 0.184,
+    "enter_days": 1.0,
+    "exit_days": 1.0,
+    "annualized_diff": 1.3901190423437626e-05,
+    "sharpe_diff": 8.641262218223034e-05,
+    "max_drawdown_integral_diff": -0.009400384569843823,
+    "drawdown_integral_definition": "full_history",
+    "drawdown_integral_recomputed": false
+  },
+  "description": "保持现有 hybrid breadth proxy + regime mix + 弱量能限仓 + 过热双层降仓 + 十年国债弱市防守框架不变，仅将弱市切债的风险仓上限从 18.6% 下调到 18.4%。"
+}

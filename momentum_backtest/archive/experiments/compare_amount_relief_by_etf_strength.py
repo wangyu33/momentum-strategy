@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
-"""测试当 A 股量能转弱但 ETF 横截面仍强时，是否放松弱量能闸门。"""
+"""测试当 A 股量能转弱但 ETF 横截面仍强时，是否放松弱量能闸门。
+
+这个 baseline 研究的是默认 regime/core 量能保护层的历史变体，不是正式 28.2691
+官方基线，因此本脚本应保持历史语义，不做官方净值锚定。
+"""
 
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+MOMENTUM_DIR = Path(__file__).resolve().parents[2]
+if str(MOMENTUM_DIR) not in sys.path:
+    sys.path.insert(0, str(MOMENTUM_DIR))
 
 try:
-    from ..runtime_env import prepare_local_imports
+    from ...runtime_env import prepare_local_imports
 except ImportError:
     from runtime_env import prepare_local_imports
 
@@ -14,24 +24,28 @@ prepare_local_imports(__file__)
 
 import pandas as pd
 
-from compare_goal_optimizations import load_market_volume_proxy
-from compare_hs300_regime_fixes import load_cached_data, run_target_weights_strategy, summarize
-from compare_market_proxy_variants import build_proxy_catalog, build_risk_proxy_features
-from run_backtest import (
+from archive_data_loaders import build_archive_flat_output_dir, build_named_market_proxy, load_recent_selected_prices
+from variant_compare_helpers import (
+    append_variant_result,
+    build_compare_frame,
+    build_typed_summary_fields,
+    finalize_baseline_diff_summary,
+    save_plot_and_print_variant_compare_outputs,
+)
+from goal_optimization_common import build_dynamic_core_target_weights, load_market_volume_proxy
+from hs300_regime_common import run_target_weights_strategy, summarize
+from market_proxy_common import build_risk_proxy_features
+from overlay_strategy_helpers import apply_risk_cap
+from archive_strategy_common import (
     DEFAULT_FEE_RATE,
     DEFAULT_SLIPPAGE_RATE,
     RISK_CODES,
     build_default_strategy_params,
-    ensure_output_dirs,
     load_default_strategy_backtest_pool,
     resolve_strategy_universe,
-    write_dataframe_csv_atomic,
 )
-from compare_goal_optimizations import build_dynamic_core_target_weights
-
-
-OUTPUT_DIR = Path("momentum_backtest/output/research/archive_flat/compare_amount_relief_by_etf_strength")
-SUMMARY_PATH = OUTPUT_DIR / "summary.csv"
+OUTPUT_DIR = build_archive_flat_output_dir("compare_amount_relief_by_etf_strength")
+INTENTIONALLY_UNANCHORED_BASELINE = True
 
 
 def parse_args() -> argparse.Namespace:
@@ -53,16 +67,12 @@ def build_relief_strategy_result(
     fee_rate: float,
     slippage_rate: float,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    proxy_catalog = {
-        item["name"]: item["proxy"]
-        for item in build_proxy_catalog(
-            market_proxy,
-            prices,
-            risk_codes=[str(code) for code in params.get("risk_codes", RISK_CODES)],
-        )
-    }
-    proxy_kind = str(params["proxy_kind"])
-    proxy = proxy_catalog[proxy_kind].reindex(prices.index).ffill()
+    proxy = build_named_market_proxy(
+        prices,
+        base_market_proxy=market_proxy,
+        proxy_kind=str(params["proxy_kind"]),
+        risk_codes=[str(code) for code in params.get("risk_codes", RISK_CODES)],
+    ).reindex(prices.index).ffill()
     features = build_risk_proxy_features(
         prices,
         risk_codes=[str(code) for code in params.get("risk_codes", RISK_CODES)],
@@ -126,15 +136,12 @@ def build_relief_strategy_result(
     if above_ma20_floor is not None:
         relief_mask = relief_mask | (features["above_ma20_frac"] >= above_ma20_floor).fillna(False)
 
-    guarded_weights = mixed_target_weights.copy()
-    weak_cap = float(params["volume_guard_cap"])
-    effective_guard_mask = volume_weak_mask & (~relief_mask) & (row_risk_weight > weak_cap)
-    if effective_guard_mask.any():
-        scale = pd.Series(1.0, index=prices.index, dtype="float64")
-        scale.loc[effective_guard_mask] = weak_cap / row_risk_weight.loc[effective_guard_mask]
-        guarded_weights.loc[effective_guard_mask, active_risk_codes] = guarded_weights.loc[
-            effective_guard_mask, active_risk_codes
-        ].mul(scale.loc[effective_guard_mask], axis=0)
+    guarded_weights = apply_risk_cap(
+        mixed_target_weights,
+        risk_budget_codes=active_risk_codes,
+        trigger_mask=volume_weak_mask & (~relief_mask),
+        risk_cap=float(params["volume_guard_cap"]),
+    )
 
     result, trades = run_target_weights_strategy(
         prices,
@@ -149,20 +156,14 @@ def build_relief_strategy_result(
 
 def main() -> int:
     args = parse_args()
-    ensure_output_dirs()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     selected = load_default_strategy_backtest_pool()
-    _, cached_prices = load_cached_data()
-    start_ts = cached_prices.index.max() - pd.DateOffset(years=args.years)
-    prices = cached_prices.loc[cached_prices.index >= start_ts].copy()
-    selected_codes = selected["code"].astype(str).tolist()
-    prices = prices[[code for code in selected_codes if code in prices.columns]].copy()
+    prices = load_recent_selected_prices(selected, args.years)
     market_proxy = load_market_volume_proxy(years=args.years, refresh=False)
 
     base_params = build_default_strategy_params()
     rows: list[dict[str, object]] = []
-    baseline: dict[str, float] | None = None
+    nav_compare = build_compare_frame(prices)
 
     variants = [
         ("baseline", None, None),
@@ -187,33 +188,49 @@ def main() -> int:
             slippage_rate=args.slippage_rate,
         )
         summary = summarize(result, trades, selected)
-        row = {
-            "name": name,
-            "annualized_return": float(summary["annualized_return"]),
-            "sharpe_rf0": float(summary["sharpe_rf0"]),
-            "max_drawdown": float(summary["max_drawdown"]),
-            "max_drawdown_integral": float(summary["max_drawdown_integral"]),
-            "trade_action_count": int(summary["trade_action_count"]),
-            "breadth_blend_floor": breadth_floor,
-            "above_ma20_floor": ma20_floor,
-        }
-        if baseline is None:
-            baseline = row.copy()
-            row["annualized_diff"] = 0.0
-            row["sharpe_diff"] = 0.0
-            row["max_drawdown_diff"] = 0.0
-            row["max_drawdown_integral_diff"] = 0.0
-        else:
-            row["annualized_diff"] = row["annualized_return"] - baseline["annualized_return"]
-            row["sharpe_diff"] = row["sharpe_rf0"] - baseline["sharpe_rf0"]
-            row["max_drawdown_diff"] = row["max_drawdown"] - baseline["max_drawdown"]
-            row["max_drawdown_integral_diff"] = row["max_drawdown_integral"] - baseline["max_drawdown_integral"]
-        rows.append(row)
+        append_variant_result(
+            rows,
+            nav_compare,
+            None,
+            strategy=name,
+            result=result,
+            strategy_field="name",
+            nav_column=f"{name}_nav",
+            summary=build_typed_summary_fields(
+                summary,
+                float_fields=("annualized_return", "sharpe_rf0", "max_drawdown", "max_drawdown_integral"),
+                int_fields=("trade_action_count",),
+            ),
+            extra_fields={
+                "breadth_blend_floor": breadth_floor,
+                "above_ma20_floor": ma20_floor,
+            },
+        )
 
-    summary_df = pd.DataFrame(rows)
-    write_dataframe_csv_atomic(summary_df, SUMMARY_PATH, index=False)
-    print(summary_df.to_string(index=False))
-    print(f"\nsummary saved to {SUMMARY_PATH}")
+    summary_df = finalize_baseline_diff_summary(
+        rows,
+        baseline_field="name",
+        baseline_value="baseline",
+        metric_mappings=(
+            ("annualized_return", "annualized_diff"),
+            ("sharpe_rf0", "sharpe_diff"),
+            ("max_drawdown", "max_drawdown_diff"),
+            ("max_drawdown_integral", "max_drawdown_integral_diff"),
+        ),
+    )
+    save_plot_and_print_variant_compare_outputs(
+        OUTPUT_DIR,
+        summary_df,
+        nav_compare,
+        plot_filename="comparison.png",
+        title="Amount Relief By ETF Strength Comparison",
+        lines=(
+            ("baseline_nav", "Baseline", 2.2),
+            ("relief_breadth_blend_ge_m1_nav", "Breadth Blend >= -1%", 1.8),
+            ("relief_above_ma20_ge_60_nav", "Above MA20 >= 60%", 1.8),
+            ("relief_combo_m1_or_ma60_nav", "Combo Relief", 1.8),
+        ),
+    )
     return 0
 
 

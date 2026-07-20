@@ -1,0 +1,18 @@
+{
+  "strategy": "regime_mix_rm511580_rm513650_volume_guard_ag28_co27_vr91_vs90_vb01_vg30_cap08_hi04_dd02_rm06_vm16_oh25_ohh32__proxy_hybrid_breadth_blend_vr91_vs90_vb-1__edge_rc188_vg284_oc067_oh029__stressbond_511260_vr90_vb-1",
+  "summary": {
+    "strategy": "regime_mix_rm511580_rm513650_volume_guard_ag28_co27_vr91_vs90_vb01_vg30_cap08_hi04_dd02_rm06_vm16_oh25_ohh32__proxy_hybrid_breadth_blend_vr91_vs90_vb-1__edge_rc188_vg284_oc067_oh029__stressbond_511260_vr90_vb-1",
+    "annualized_return": 0.2346614068144988,
+    "sharpe_rf0": 1.164419429202135,
+    "max_drawdown_integral": 39.16666113238881,
+    "max_drawdown": -0.21762753110239608,
+    "total_return": 18.10045078227139,
+    "risk_cap": 0.188,
+    "vg_cap": 0.284,
+    "overheat_cap": 0.067,
+    "overheat_hi_cap": 0.029,
+    "drawdown_integral_definition": "full_history",
+    "drawdown_integral_recomputed": false
+  },
+  "description": "在当前正式基线附近做局部细化：风险仓上限维持18.8%，弱量能上限从28.5%收紧到28.4%，过热/极热上限调整为6.7%/2.9%，其余框架不变。"
+}

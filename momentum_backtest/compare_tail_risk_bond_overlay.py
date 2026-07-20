@@ -16,16 +16,16 @@ prepare_local_imports(__file__)
 import pandas as pd
 
 try:
-    from .compare_candidate_pool_additions import ETF_511090, ETF_511260
-    from .compare_hs300_regime_fixes import load_cached_data, run_target_weights_strategy, summarize
-    from .compare_goal_optimizations import (
+    from .candidate_pool_common import ETF_511090, ETF_511260
+    from .goal_optimization_common import (
         DEFAULT_FEISHU_WEBHOOK,
         GOAL_OUTPUT_DIR,
         METRIC_TOLERANCE,
         parse_regime_mix_strategy_name,
         send_improvement_notification,
     )
-    from .compare_market_proxy_variants import build_proxy_catalog
+    from .hs300_regime_common import load_cached_data, run_target_weights_strategy, summarize
+    from .market_proxy_common import build_proxy_catalog, evaluate_strategy
     from .official_strategy_core import build_official_target_weights
     from .search_utils import (
         add_notify_cli_args,
@@ -37,16 +37,16 @@ try:
         write_json_atomic,
     )
 except ImportError:
-    from compare_candidate_pool_additions import ETF_511090, ETF_511260
-    from compare_hs300_regime_fixes import load_cached_data, run_target_weights_strategy, summarize
-    from compare_goal_optimizations import (
+    from candidate_pool_common import ETF_511090, ETF_511260
+    from goal_optimization_common import (
         DEFAULT_FEISHU_WEBHOOK,
         GOAL_OUTPUT_DIR,
         METRIC_TOLERANCE,
         parse_regime_mix_strategy_name,
         send_improvement_notification,
     )
-    from compare_market_proxy_variants import build_proxy_catalog
+    from hs300_regime_common import load_cached_data, run_target_weights_strategy, summarize
+    from market_proxy_common import build_proxy_catalog, evaluate_strategy
     from official_strategy_core import build_official_target_weights
     from search_utils import (
         add_notify_cli_args,
@@ -234,7 +234,7 @@ def main() -> int:
     if str(ETF_511260["code"]) not in prices.columns:
         raise RuntimeError(f"missing required baseline treasury history: {ETF_511260['code']} {ETF_511260['name']}")
 
-    from compare_goal_optimizations import load_market_volume_proxy
+    from goal_optimization_common import load_market_volume_proxy
 
     base_market_proxy = load_market_volume_proxy(years=args.years, refresh=args.refresh)
     proxy_catalog = {item["name"]: item["proxy"] for item in build_proxy_catalog(base_market_proxy, prices)}
@@ -249,8 +249,6 @@ def main() -> int:
     baseline_selected = pd.concat([base_selected, pd.DataFrame([ETF_511260])], ignore_index=True)
     baseline_selected = baseline_selected.drop_duplicates(subset=["code"], keep="first").reset_index(drop=True)
     baseline_prices = prices[[code for code in baseline_selected["code"].astype(str) if code in prices.columns]].copy()
-    from compare_market_proxy_variants import evaluate_strategy
-
     baseline_result, baseline_trades = evaluate_strategy(
         selected=baseline_selected,
         prices=baseline_prices,

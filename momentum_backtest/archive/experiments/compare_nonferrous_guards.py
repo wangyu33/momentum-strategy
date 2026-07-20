@@ -4,9 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+MOMENTUM_DIR = Path(__file__).resolve().parents[2]
+if str(MOMENTUM_DIR) not in sys.path:
+    sys.path.insert(0, str(MOMENTUM_DIR))
 
 try:
-    from ..runtime_env import configure_matplotlib_env, prepare_local_imports
+    from ...runtime_env import configure_matplotlib_env, prepare_local_imports
 except ImportError:
     from runtime_env import configure_matplotlib_env, prepare_local_imports
 
@@ -16,9 +22,27 @@ configure_matplotlib_env()
 import matplotlib
 import pandas as pd
 
-from compare_candidate_pool_additions import BASE_DEFENSIVE_CODES, BASE_RISK_CODES
-from compare_strategy_refinements import run_signal_strategy
-from run_backtest import (
+try:
+    from ...official_baseline import apply_official_baseline_nav_anchor
+except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
+
+from candidate_pool_common import BASE_DEFENSIVE_CODES, BASE_RISK_CODES
+from archive_data_loaders import (
+    build_archive_flat_output_dir,
+    dedupe_selected_pool,
+    load_required_candidate_prices,
+    load_recent_selected_prices,
+)
+from dual_momentum_helpers import summarize_variant_result as summarize_exposure_variant_result
+from strategy_signal_common import run_signal_strategy
+from variant_compare_helpers import (
+    append_variant_result,
+    ensure_compare_frame,
+    finalize_baseline_diff_summary,
+    save_plot_and_print_variant_compare_outputs,
+)
+from archive_strategy_common import (
     DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD,
     DEFAULT_FEE_RATE,
     DEFAULT_OVERHEAT_DRAWDOWN_CUT,
@@ -28,21 +52,15 @@ from run_backtest import (
     DEFAULT_OVERHEAT_MOMENTUM_CUT,
     DEFAULT_SLIPPAGE_RATE,
     DEFAULT_WEAK_TREND_DEFENSIVE_WEIGHT,
-    RESEARCH_OUTPUT_DIR,
-    annualized_return,
-    build_benchmark_nav,
-    ensure_output_dirs,
     fetch_histories,
     load_fixed_etf_pool,
-    max_drawdown,
 )
 
 matplotlib.use("Agg")
-from matplotlib import pyplot as plt
 
 NONFERROUS_ETF = {"theme": "有色金属", "code": "512400", "name": "有色金属ETF南方", "sina_symbol": "sh512400"}
 NONFERROUS_CODE = "512400"
-OUTPUT_DIR = RESEARCH_OUTPUT_DIR / "archive_flat" / "compare_nonferrous_guards"
+OUTPUT_DIR = build_archive_flat_output_dir("compare_nonferrous_guards")
 
 
 def parse_args() -> argparse.Namespace:
@@ -52,29 +70,35 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lookback", type=int, default=25, help="Momentum lookback window.")
     parser.add_argument("--fee-rate", type=float, default=DEFAULT_FEE_RATE, help="Single-side fee rate.")
     parser.add_argument("--slippage-rate", type=float, default=DEFAULT_SLIPPAGE_RATE, help="Single-side slippage rate.")
+    parser.add_argument("--refresh", action="store_true", help="Fetch fresh histories instead of preferring cached core prices.")
+    parser.add_argument("--base-only", action="store_true", help="Only run the cached base_pool variant.")
     return parser.parse_args()
 
 
-def summarize(result: pd.DataFrame, trades: pd.DataFrame) -> dict[str, float | int | str]:
-    daily_ret = result["strategy_return"].fillna(0.0)
-    ann_ret = annualized_return(result["nav"])
-    ann_vol = float(daily_ret.std(ddof=0) * (252 ** 0.5))
-    sharpe = ann_ret / ann_vol if ann_vol > 0 else float("nan")
-    holding_share = float((result["holding"] == NONFERROUS_CODE).fillna(False).mean())
-    return {
-        "start_date": result.index[0].date().isoformat(),
-        "end_date": result.index[-1].date().isoformat(),
-        "total_return": float(result["nav"].iloc[-1] - 1),
-        "annualized_return": ann_ret,
-        "annualized_volatility": ann_vol,
-        "sharpe_rf0": sharpe,
-        "max_drawdown": max_drawdown(result["nav"]),
-        "trade_count": int(len(trades)),
-        "avg_exposure": float(result["exposure"].mean()),
-        "nonferrous_holding_share": holding_share,
-        "latest_momentum": float(result["current_momentum"].dropna().iloc[-1]),
-        "latest_exposure": float(result["exposure"].iloc[-1]),
-    }
+def load_variant_prices(
+    base_pool: pd.DataFrame,
+    selected: pd.DataFrame,
+    *,
+    years: int,
+    refresh: bool,
+    include_nonferrous: bool,
+) -> pd.DataFrame:
+    selected = dedupe_selected_pool(selected)
+    if not refresh and not include_nonferrous:
+        return load_recent_selected_prices(selected, years)
+    if not include_nonferrous:
+        return fetch_histories(selected, years=years).dropna(how="any")
+
+    _, prices = load_required_candidate_prices(
+        base_pool,
+        [NONFERROUS_ETF],
+        years=years,
+        refresh=refresh,
+        fetch_fn=fetch_histories,
+        label="nonferrous candidates",
+        failure_prefix="failed to load nonferrous ETF history",
+    )
+    return prices.dropna(how="any")
 
 
 def build_base_components(prices: pd.DataFrame, lookback: int) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -177,8 +201,7 @@ def main() -> int:
     args = parse_args()
     base_pool = load_fixed_etf_pool()
     selected = pd.concat([base_pool, pd.DataFrame([NONFERROUS_ETF])], ignore_index=True)
-    prices = fetch_histories(selected, years=args.years).dropna(how="any")
-    prices = prices.loc[prices.index >= pd.Timestamp(args.start_date)]
+    selected = dedupe_selected_pool(selected)
 
     variants = [
         ("base_pool", None, None, None, False),
@@ -191,15 +214,30 @@ def main() -> int:
         ("nonferrous_margin_05", None, 0.05, None, True),
         ("nonferrous_margin_03_cap_70", None, 0.03, 0.70, True),
     ]
+    if args.base_only:
+        variants = variants[:1]
 
     rows: list[dict[str, object]] = []
     compare_df = None
-    base_metrics: dict[str, float | int] = {}
-    base_prices = prices[base_pool["code"].tolist()].copy()
+    base_prices = load_variant_prices(base_pool, base_pool, years=args.years, refresh=args.refresh, include_nonferrous=False)
+    base_prices = base_prices.loc[base_prices.index >= pd.Timestamp(args.start_date)]
+    all_prices: pd.DataFrame | None = None
 
     for name, abs_thr, margin_thr, max_exposure, include_nonferrous in variants:
         current_selected = selected if include_nonferrous else base_pool.copy()
-        current_prices = prices if include_nonferrous else base_prices
+        if include_nonferrous:
+            if all_prices is None:
+                all_prices = load_variant_prices(
+                    base_pool,
+                    selected,
+                    years=args.years,
+                    refresh=args.refresh,
+                    include_nonferrous=True,
+                )
+                all_prices = all_prices.loc[all_prices.index >= pd.Timestamp(args.start_date)]
+            current_prices = all_prices
+        else:
+            current_prices = base_prices
         result, trades = run_variant(
             current_prices,
             current_selected,
@@ -210,56 +248,64 @@ def main() -> int:
             nonferrous_margin_threshold=margin_thr if include_nonferrous else None,
             nonferrous_max_exposure=max_exposure if include_nonferrous else None,
         )
-        if compare_df is None:
-            compare_df = pd.DataFrame(index=result.index)
-            compare_df["hs300_benchmark"] = build_benchmark_nav(current_prices, benchmark_code="510300")
-        compare_df[name] = result["nav"].reindex(compare_df.index)
-        row = {"variant": name, **summarize(result, trades)}
-        rows.append(row)
         if name == "base_pool":
-            base_metrics = {
-                "total_return": float(row["total_return"]),
-                "annualized_return": float(row["annualized_return"]),
-                "sharpe_rf0": float(row["sharpe_rf0"]),
-                "max_drawdown": float(row["max_drawdown"]),
-                "trade_count": int(row["trade_count"]),
-            }
+            result = apply_official_baseline_nav_anchor(result)
+        compare_df = ensure_compare_frame(compare_df, current_prices, index=result.index)
+        row = summarize_exposure_variant_result(
+            result,
+            trades,
+            current_selected,
+            include_window_dates=True,
+            extra_fields={
+                "nonferrous_holding_share": float((result["holding"] == NONFERROUS_CODE).fillna(False).mean())
+            },
+        )
+        append_variant_result(
+            rows,
+            compare_df,
+            None,
+            strategy=name,
+            result=result,
+            summary=row,
+            strategy_field="variant",
+            nav_column=name,
+        )
+    summary = finalize_baseline_diff_summary(
+        rows,
+        baseline_field="variant",
+        baseline_value="base_pool",
+        metric_mappings=(
+            ("total_return", "return_diff"),
+            ("annualized_return", "annualized_diff"),
+            ("sharpe_rf0", "sharpe_diff"),
+            ("max_drawdown", "mdd_diff"),
+            ("trade_count", "trade_diff"),
+        ),
+    )
 
-    summary = pd.DataFrame(rows)
-    summary["return_diff"] = summary["total_return"] - float(base_metrics["total_return"])
-    summary["annualized_diff"] = summary["annualized_return"] - float(base_metrics["annualized_return"])
-    summary["sharpe_diff"] = summary["sharpe_rf0"] - float(base_metrics["sharpe_rf0"])
-    summary["mdd_diff"] = summary["max_drawdown"] - float(base_metrics["max_drawdown"])
-    summary["trade_diff"] = summary["trade_count"] - int(base_metrics["trade_count"])
-
-    ensure_output_dirs()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    summary.to_csv(OUTPUT_DIR / "summary.csv", index=False)
-    compare_df.to_csv(OUTPUT_DIR / "nav_compare.csv")
-
-    plt.style.use("seaborn-v0_8-whitegrid")
-    fig, ax = plt.subplots(figsize=(14, 7))
-    for column in [
-        "base_pool",
-        "nonferrous_risk",
-        "nonferrous_cap_70",
-        "nonferrous_abs_08",
-        "nonferrous_margin_03",
-        "nonferrous_margin_03_cap_70",
-    ]:
-        ax.plot(compare_df.index, compare_df[column], linewidth=1.8 if column != "base_pool" else 2.3, label=column)
-    ax.plot(compare_df.index, compare_df["hs300_benchmark"], linewidth=1.5, linestyle="--", label="HS300 ETF")
-    ax.set_title("Nonferrous Metals ETF Guard Variants", loc="left", fontsize=16, fontweight="bold")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Net Value")
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(OUTPUT_DIR / "comparison.png", dpi=180, bbox_inches="tight")
-    plt.close(fig)
-
-    print(summary.to_csv(index=False))
+    plot_lines = [
+        ("base_pool", "base_pool", 2.3),
+        ("nonferrous_risk", "nonferrous_risk", 1.8),
+        ("nonferrous_cap_70", "nonferrous_cap_70", 1.8),
+        ("nonferrous_abs_08", "nonferrous_abs_08", 1.8),
+        ("nonferrous_margin_03", "nonferrous_margin_03", 1.8),
+        ("nonferrous_margin_03_cap_70", "nonferrous_margin_03_cap_70", 1.8),
+    ]
+    save_plot_and_print_variant_compare_outputs(
+        OUTPUT_DIR,
+        summary,
+        compare_df,
+        plot_filename="comparison.png",
+        title="Nonferrous Metals ETF Guard Variants",
+        lines=[line for line in plot_lines if line[0] in compare_df.columns],
+        benchmark_label="HS300 ETF",
+    )
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1)

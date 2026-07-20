@@ -15,11 +15,13 @@ prepare_local_imports(__file__, include_module_dir=False)
 import pandas as pd
 
 try:
-    from .compare_hs300_regime_fixes import summarize
-    from .compare_goal_optimizations import load_market_volume_proxy
+    from .hs300_regime_common import summarize
+    from .goal_optimization_common import load_market_volume_proxy
+    from .official_baseline import apply_official_baseline_nav_anchor
 except ImportError:
-    from compare_hs300_regime_fixes import summarize
-    from compare_goal_optimizations import load_market_volume_proxy
+    from hs300_regime_common import summarize
+    from goal_optimization_common import load_market_volume_proxy
+    from official_baseline import apply_official_baseline_nav_anchor
 
 from run_backtest import (
     DEFAULT_BASELINE_DROP_CODES,
@@ -112,6 +114,8 @@ def main() -> int:
             fee_rate=args.fee_rate,
             slippage_rate=args.slippage_rate,
         )
+        if variant_name == "baseline":
+            result = apply_official_baseline_nav_anchor(result)
         row = summarize(result, trades, selected)
         row["variant"] = variant_name
         row["risk_codes"] = ",".join(code for code in risk_codes if code in prices.columns)

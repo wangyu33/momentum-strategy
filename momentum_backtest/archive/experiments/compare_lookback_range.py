@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
-"""Compare threshold dual momentum performance across a continuous lookback range."""
+"""Compare threshold dual momentum performance across a continuous lookback range.
+
+This script compares historical threshold-dual variants rather than the official 28.2691
+formal baseline, so it should keep its own research-chain semantics.
+"""
 
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+MOMENTUM_DIR = Path(__file__).resolve().parents[2]
+if str(MOMENTUM_DIR) not in sys.path:
+    sys.path.insert(0, str(MOMENTUM_DIR))
 
 try:
-    from ..runtime_env import configure_matplotlib_env, prepare_local_imports
+    from ...runtime_env import configure_matplotlib_env, prepare_local_imports
 except ImportError:
     from runtime_env import configure_matplotlib_env, prepare_local_imports
 
@@ -16,25 +26,28 @@ configure_matplotlib_env()
 import matplotlib
 import pandas as pd
 
-from run_backtest import (
-    CORE_OUTPUT_DIR,
+from archive_data_loaders import build_archive_flat_output_dir, load_core_selected_and_prices
+from variant_compare_helpers import (
+    append_variant_result,
+    build_compare_frame,
+    build_summary_frame,
+    finalize_baseline_diff_summary,
+    save_plot_and_print_variant_compare_outputs,
+    summarize_variant_result,
+)
+from archive_strategy_common import (
     DEFAULT_FEE_RATE,
     DEFAULT_SLIPPAGE_RATE,
-    RESEARCH_OUTPUT_DIR,
-    annualized_return,
-    build_benchmark_nav,
-    ensure_output_dirs,
     fetch_histories,
     load_fixed_etf_pool,
-    max_drawdown,
     run_threshold_dual_strategy,
 )
 
 matplotlib.use("Agg")
-from matplotlib import pyplot as plt
 
 
-OUTPUT_DIR = RESEARCH_OUTPUT_DIR / "archive_flat" / "compare_lookback_range"
+OUTPUT_DIR = build_archive_flat_output_dir("compare_lookback_range")
+INTENTIONALLY_UNANCHORED_BASELINE = True
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,32 +61,17 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def summarize(result: pd.DataFrame, trades: pd.DataFrame) -> dict[str, float | int]:
-    daily_ret = result["strategy_return"].fillna(0.0)
-    ann_ret = annualized_return(result["nav"])
-    ann_vol = float(daily_ret.std(ddof=0) * (252 ** 0.5))
-    sharpe = ann_ret / ann_vol if ann_vol > 0 else float("nan")
-    return {
-        "total_return": float(result["nav"].iloc[-1] - 1),
-        "annualized_return": ann_ret,
-        "annualized_volatility": ann_vol,
-        "sharpe_rf0": sharpe,
-        "max_drawdown": max_drawdown(result["nav"]),
-        "trade_count": int(len(trades)),
-    }
-
-
 def main() -> int:
     args = parse_args()
-    selected = load_fixed_etf_pool()
-    if args.refresh:
-        prices = fetch_histories(selected, years=args.years)
-    else:
-        prices = pd.read_csv(CORE_OUTPUT_DIR / "prices.csv", parse_dates=["date"]).set_index("date")
+    selected, prices = load_core_selected_and_prices(
+        load_fixed_etf_pool(),
+        years=args.years,
+        refresh=args.refresh,
+        fetch_fn=fetch_histories,
+    )
 
     rows = []
-    compare_df = pd.DataFrame(index=prices.index)
-    compare_df["hs300_benchmark"] = build_benchmark_nav(prices, benchmark_code="510300")
+    compare_df = build_compare_frame(prices)
 
     for lookback in range(args.lookback_start, args.lookback_end + 1):
         result, trades = run_threshold_dual_strategy(
@@ -83,32 +81,41 @@ def main() -> int:
             fee_rate=args.fee_rate,
             slippage_rate=args.slippage_rate,
         )
-        row = {"lookback": lookback, **summarize(result, trades)}
-        rows.append(row)
-        compare_df[f"k_{lookback}_nav"] = result["nav"]
+        append_variant_result(
+            rows,
+            compare_df,
+            None,
+            strategy=f"k_{lookback}",
+            result=result,
+            summary=summarize_variant_result(result, trades),
+            strategy_field="strategy",
+            nav_column=f"k_{lookback}_nav",
+            extra_fields={"lookback": lookback},
+        )
 
-    summary = pd.DataFrame(rows).sort_values(["sharpe_rf0", "annualized_return"], ascending=[False, False])
-    ensure_output_dirs()
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    summary.to_csv(OUTPUT_DIR / "summary.csv", index=False)
-    compare_df.to_csv(OUTPUT_DIR / "nav_compare.csv")
-
-    plt.style.use("seaborn-v0_8-whitegrid")
-    fig, ax = plt.subplots(figsize=(14, 7))
+    summary = build_summary_frame(rows, sort_by=["sharpe_rf0", "annualized_return"], ascending=[False, False])
+    best_lookback = int(summary.iloc[0]["lookback"])
+    summary = finalize_baseline_diff_summary(
+        summary,
+        baseline_field="lookback",
+        baseline_value=args.lookback_start,
+        metric_mappings=[
+            ("total_return", "return_diff_vs_first"),
+            ("annualized_return", "annualized_diff_vs_first"),
+            ("sharpe_rf0", "sharpe_diff_vs_first"),
+            ("max_drawdown", "mdd_diff_vs_first"),
+            ("trade_count", "trade_diff_vs_first"),
+        ],
+    )
     top_rows = summary.head(4)
-    for _, row in top_rows.iterrows():
-        k = int(row["lookback"])
-        ax.plot(compare_df.index, compare_df[f"k_{k}_nav"], linewidth=2.0, label=f"k={k}")
-    ax.plot(compare_df.index, compare_df["hs300_benchmark"], linewidth=1.6, linestyle="--", label="HS300")
-    ax.set_title("Threshold Dual Momentum Lookback Range", loc="left", fontsize=16, fontweight="bold")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Net Value")
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(OUTPUT_DIR / "comparison.png", dpi=180, bbox_inches="tight")
-    plt.close(fig)
-
-    print(summary.to_csv(index=False))
+    save_plot_and_print_variant_compare_outputs(
+        OUTPUT_DIR,
+        summary,
+        compare_df,
+        plot_filename="comparison.png",
+        title=f"Threshold Dual Momentum Lookback Range (best={best_lookback})",
+        lines=[(f"k_{int(row['lookback'])}_nav", f"k={int(row['lookback'])}", 2.0) for _, row in top_rows.iterrows()],
+    )
     return 0
 
 

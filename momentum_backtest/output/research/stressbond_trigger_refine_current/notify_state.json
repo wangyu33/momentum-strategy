@@ -1,0 +1,17 @@
+{
+  "strategy": "regime_mix_rm511580_rm513650_volume_guard_ag28_co27_vr91_vs90_vb01_vg30_cap08_hi04_dd02_rm06_vm16_oh25_ohh32__proxy_hybrid_breadth_blend_vr91_vs90_vb-1__edge_rc186_vg283_oc066_oh030__stressbond_511260_vr90_vb-1",
+  "summary": {
+    "strategy": "regime_mix_rm511580_rm513650_volume_guard_ag28_co27_vr91_vs90_vb01_vg30_cap08_hi04_dd02_rm06_vm16_oh25_ohh32__proxy_hybrid_breadth_blend_vr91_vs90_vb-1__edge_rc186_vg283_oc066_oh030__stressbond_511260_vr90_vb-1",
+    "annualized_return": 0.23469215032147814,
+    "sharpe_rf0": 1.1645920137810521,
+    "max_drawdown_integral": 39.15646659914976,
+    "max_drawdown": -0.21757190630953493,
+    "total_return": 18.10710344350665,
+    "risk_cap": 0.186,
+    "ratio_cut": 0.9,
+    "breadth_cut": -0.03,
+    "drawdown_integral_definition": "full_history",
+    "drawdown_integral_recomputed": false
+  },
+  "description": "在当前正式基线附近继续细化弱市切债层：触发条件保持20/60量能<90%、广度<-3%不变，仅把切债时风险仓上限从18.8%下调到18.6%，其余框架不变。"
+}

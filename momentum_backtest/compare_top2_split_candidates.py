@@ -16,6 +16,11 @@ configure_matplotlib_env()
 
 import pandas as pd
 
+try:
+    from .official_baseline import apply_official_baseline_nav_anchor
+except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
+
 from run_backtest import (
     build_default_strategy_params,
     build_signal_quality_score,
@@ -24,8 +29,9 @@ from run_backtest import (
     resolve_strategy_universe,
     write_dataframe_csv_atomic,
 )
-from compare_market_proxy_variants import build_proxy_catalog
-from compare_hs300_regime_fixes import run_target_weights_strategy
+from market_proxy_common import build_proxy_catalog
+from hs300_regime_common import run_target_weights_strategy
+from official_candidate_runner import extract_target_weights
 from official_strategy_core import build_official_target_weights
 
 OUTPUT_DIR = Path("momentum_backtest/output/research/top2_split_candidates")
@@ -65,14 +71,6 @@ def load_official_inputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, di
     }
     effective_proxy = proxy_catalog[str(params["proxy_kind"])]
     return selected, prices, effective_proxy, params
-
-
-def extract_target_weights(result: pd.DataFrame) -> pd.DataFrame:
-    cols = [c for c in result.columns if c.startswith("target_weight_")]
-    target = result[cols].copy()
-    target.columns = [c.removeprefix("target_weight_") for c in cols]
-    return target
-
 
 def build_top2_context(prices: pd.DataFrame, params: dict[str, object]) -> tuple[pd.Series, pd.Series]:
     momentum, score = build_signal_quality_score(
@@ -194,6 +192,7 @@ def main() -> int:
     rows: list[dict[str, object]] = []
 
     baseline_result, baseline_trades = run_variant_from_weights(prices, selected, base_weights, base_result)
+    baseline_result = apply_official_baseline_nav_anchor(baseline_result)
     baseline_summary = summarize_variant(
         baseline_result,
         baseline_trades,
