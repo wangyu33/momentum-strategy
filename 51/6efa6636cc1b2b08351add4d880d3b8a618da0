@@ -1,0 +1,561 @@
+momentum_backtest/README.md
+  s_7547295703ceb0::t_b7b5b0d6746723 34-35,44,64-67,94-97,107-111,115,204,439,455-456,808,811
+momentum_backtest/analyze_candidate_diversifiers.py
+  s_7547295703ceb0::t_318112e3644728 18-71
+momentum_backtest/analyze_pair_correlation.py
+  s_7547295703ceb0::t_831f37a689fdab 18-21
+momentum_backtest/archive/experiments/archive_data_loaders.py
+  s_7547295703ceb0::t_8717635f6068d8 1-419
+momentum_backtest/archive/experiments/context_loaders.py
+  s_7547295703ceb0::t_d35bf3d1271c74 1-255
+momentum_backtest/archive/experiments/overlay_candidate_catalog.py
+  s_7547295703ceb0::t_00c112ee95f4d4 1-24
+momentum_backtest/archive/experiments/overlay_strategy_helpers.py
+  s_7547295703ceb0::t_b3b673266d8173 1-456
+momentum_backtest/archive/experiments/pool_change_helpers.py
+  s_7547295703ceb0::t_646cca9d8ed481 1-9
+momentum_backtest/candidate_pool_common.py
+  s_7547295703ceb0::t_e3246b34e95c57 1-238
+momentum_backtest/china_internet_guard_common.py
+  s_7547295703ceb0::t_dc9b4417a036ce 1-140
+momentum_backtest/compare_asset_relative_volatility_variants.py
+  s_7547295703ceb0::t_5122e405cade78 19-24,132-133
+momentum_backtest/compare_candidate_pool_additions.py
+  s_7547295703ceb0::t_03deffc24d88f6 19-47,215-218,224-225,237-238
+momentum_backtest/compare_china_internet_guards.py
+  s_7547295703ceb0::t_fdc2dc8c81eb12 20-26,28-34,51-54,93,103-104,109
+momentum_backtest/compare_continuous_transition.py
+  s_7547295703ceb0::t_a4973d020de629 19-23,88
+momentum_backtest/compare_current_best_fine_tune.py
+  s_7547295703ceb0::t_44bcaef47c8b38 37,57,803-804
+momentum_backtest/compare_current_best_pool_additions.py
+  s_7547295703ceb0::t_7f1bde95cedb1f 17-20,24,31-32,34,37-39,41-44,48,55-56,58,61-63,136-153,157-158,160-166,177
+momentum_backtest/compare_defensive_candidate_161716.py
+  s_7547295703ceb0::t_7c9da566c35f98 18-20,22-24,117-118
+momentum_backtest/compare_diversifier_experiments.py
+  s_7547295703ceb0::t_ff76f9efaa2c28 10,13,20,26-28,30,36-38,112,114-115
+momentum_backtest/compare_market_proxy_variants.py
+  s_7547295703ceb0::t_4648d2152c7e41 35,54,309
+momentum_backtest/compare_next_optimization_candidates.py
+  s_7547295703ceb0::t_9f787f1e5e80f1 19-23,121
+momentum_backtest/compare_resource_guards.py
+  s_7547295703ceb0::t_66aa04f6f71089 20-21,24-25,218-219
+momentum_backtest/compare_signal_stability_variants.py
+  s_7547295703ceb0::t_d93755ac6c87d5 19-24,123-124
+momentum_backtest/compare_similarity_dampening.py
+  s_7547295703ceb0::t_1c5fc08451df9f 20,24,73-74
+momentum_backtest/compare_single_candidate.py
+  s_7547295703ceb0::t_f2b191f6e23342 13-17,23-40,74-75
+momentum_backtest/compare_slope_combo_replacements.py
+  s_7547295703ceb0::t_8a34146836063e 27-28
+momentum_backtest/compare_targeted_stability_guards.py
+  s_7547295703ceb0::t_a00bbbd876cc9a 19-24,155-156
+momentum_backtest/compare_top2_riskcap_candidates.py
+  s_7547295703ceb0::t_f5892a707a69fd 19-23,31,105
+momentum_backtest/compare_top2_split_candidates.py
+  s_7547295703ceb0::t_0f4fe131fe8264 19-23,32-34,195
+momentum_backtest/compare_weak_trend_zone_optimizations.py
+  s_7547295703ceb0::t_27fc71763c607f 22-26,147,163-164
+momentum_backtest/daily_monitor.py
+  s_7547295703ceb0::t_603cc5803ff196 27,69
+momentum_backtest/defensive_persistence_common.py
+  s_7547295703ceb0::t_53970de69676ee 1-9
+momentum_backtest/hs300_regime_common.py
+  s_7547295703ceb0::t_f8bae45c8f65e5 1-9
+momentum_backtest/market_proxy_common.py
+  s_7547295703ceb0::t_a9aa4f3a8999c7 1-10
+momentum_backtest/monitor_delivery.py
+  s_a97431bcd4e315::t_ec61fb9c7340b5 231-264,272-273
+momentum_backtest/monitor_snapshot_builders.py
+  s_7547295703ceb0::t_1ad37093801397 295-297
+momentum_backtest/official_baseline.py
+  s_7547295703ceb0::t_3e85a142b8b190 1-60
+momentum_backtest/official_candidate_runner.py
+  s_7547295703ceb0::t_5c416de8048817 9-11,19-21,47,59,65-66
+momentum_backtest/output/analysis/contribution_overview.csv
+  s_7547295703ceb0::t_0856eb70ddf541 1-2
+momentum_backtest/output/analysis/contribution_summary.csv
+  s_7547295703ceb0::t_b1b5abe1dda7c3 1-10
+momentum_backtest/output/analysis/drawdown_episodes.csv
+  s_7547295703ceb0::t_f7583795bd7729 1-149
+momentum_backtest/output/core/backtest_nav.csv
+  s_7547295703ceb0::t_eb4063bff1baf1 1-3436
+momentum_backtest/output/core/contribution_summary.csv
+  s_7547295703ceb0::t_5d2548261bcdc2 1-10
+momentum_backtest/output/core/historical_nav.csv
+  s_7547295703ceb0::t_58be8985f94f01 1-3436
+momentum_backtest/output/core/prices.csv
+  s_7547295703ceb0::t_7b56adb50b4517 1-3436
+momentum_backtest/output/core/selected_etfs.csv
+  s_7547295703ceb0::t_2aa47679a48d16 1-10
+momentum_backtest/output/core/strategy_vs_hs300.csv
+  s_7547295703ceb0::t_c811164401b5dd 1-3436
+momentum_backtest/output/core/trades.csv
+  s_7547295703ceb0::t_6445ae4403e4b4 1-1628
+momentum_backtest/output/core/yearly_returns.csv
+  s_7547295703ceb0::t_3de1083789d688 1-16
+momentum_backtest/output/monitor/daily_momentum_board.csv
+  s_8ebd05406e1914::t_59fca37b01ab13 1-10
+momentum_backtest/output/monitor/daily_momentum_board.run.log
+  s_8ebd05406e1914::t_af797f9ddace84 1-166
+momentum_backtest/output/monitor/daily_momentum_board.txt
+  s_8ebd05406e1914::t_2c46253e4d6611 1-14
+momentum_backtest/output/monitor/daily_momentum_board_state.json
+  s_8ebd05406e1914::t_c4d2867910a13f 1-14
+momentum_backtest/output/monitor/daily_monitor.run.log
+  s_7547295703ceb0::t_a02bc4cb1cf0aa 1-211
+momentum_backtest/output/monitor/daily_monitor_state.json
+  s_7547295703ceb0::t_f6ede44ecc4d9b 1-85
+momentum_backtest/output/monitor/nikkei225_weight_20260630.csv
+  s_8ebd05406e1914::t_3fe4a7923c4159 1-227
+momentum_backtest/output/monitor/trade_calendar_cache.csv
+  s_7547295703ceb0::t_170714c4b1a22f 1-8798
+momentum_backtest/output/reference/official_baseline_nav.csv
+  s_7547295703ceb0::t_cd87afd748b82e 1-3438
+momentum_backtest/output/research/archive_flat/compare_amount_proxy_blends/nav_compare.csv
+  s_7547295703ceb0::t_f132294f876ce6 1-3436
+momentum_backtest/output/research/archive_flat/compare_amount_proxy_blends/summary.csv
+  s_7547295703ceb0::t_5fcfe989eddf00 1-10
+momentum_backtest/output/research/archive_flat/compare_cash_overlay_candidates/best.json
+  s_7547295703ceb0::t_0bda5198c20575 1-34
+momentum_backtest/output/research/archive_flat/compare_cash_overlay_candidates/nav_compare.csv
+  s_7547295703ceb0::t_8fe90b1c1d2f06 1-3436
+momentum_backtest/output/research/archive_flat/compare_cash_overlay_candidates/summary.csv
+  s_7547295703ceb0::t_b8897f4c077e6e 1-2
+momentum_backtest/output/research/archive_flat/compare_china_internet_germany_variants/nav_compare.csv
+  s_7547295703ceb0::t_394ad9a7c0dfd4 1-753
+momentum_backtest/output/research/archive_flat/compare_china_internet_germany_variants/skipped_variants.csv
+  s_7547295703ceb0::t_683b950eb6bed6 1-5
+momentum_backtest/output/research/archive_flat/compare_china_internet_germany_variants/summary.csv
+  s_7547295703ceb0::t_99fb6abfc087f2 1-3
+momentum_backtest/output/research/archive_flat/compare_common_sense_enhancements/nav_compare.csv
+  s_7547295703ceb0::t_b56f979d9e26a1 1-3436
+momentum_backtest/output/research/archive_flat/compare_common_sense_enhancements/summary.csv
+  s_7547295703ceb0::t_740137d8584cdf 1-8
+momentum_backtest/output/research/archive_flat/compare_defensive_bucket_blends/best.json
+  s_7547295703ceb0::t_1b6ee1c1cb989d 1-27
+momentum_backtest/output/research/archive_flat/compare_defensive_bucket_blends/nav_compare.csv
+  s_7547295703ceb0::t_97f11e919484bb 1-3436
+momentum_backtest/output/research/archive_flat/compare_defensive_bucket_blends/summary.csv
+  s_7547295703ceb0::t_dbcae58e55802a 1-2
+momentum_backtest/output/research/archive_flat/compare_defensive_reentry_probe/nav_compare.csv
+  s_7547295703ceb0::t_668b0894c6cd02 1-3436
+momentum_backtest/output/research/archive_flat/compare_defensive_reentry_probe/summary.csv
+  s_7547295703ceb0::t_60666a929e3602 1-11
+momentum_backtest/output/research/archive_flat/compare_dividend_defensive_additions/base_pool_nav.csv
+  s_7547295703ceb0::t_6c50ab4d7a0d6f 1-2428
+momentum_backtest/output/research/archive_flat/compare_dividend_defensive_additions/base_pool_trades.csv
+  s_7547295703ceb0::t_ba1927ed89fe96 1-920
+momentum_backtest/output/research/archive_flat/compare_dividend_defensive_additions/nav_compare.csv
+  s_7547295703ceb0::t_447317381c90ce 1-2428
+momentum_backtest/output/research/archive_flat/compare_dividend_defensive_additions/summary.csv
+  s_7547295703ceb0::t_88d15c5411bd00 1-2
+momentum_backtest/output/research/archive_flat/compare_dual_momentum_variants/breadth_dual_momentum_nav.csv
+  s_7547295703ceb0::t_ab0c603f50c19d 1-3436
+momentum_backtest/output/research/archive_flat/compare_dual_momentum_variants/breadth_dual_momentum_trades.csv
+  s_7547295703ceb0::t_30061e030158d5 1-1155
+momentum_backtest/output/research/archive_flat/compare_dual_momentum_variants/nav_compare.csv
+  s_7547295703ceb0::t_0301eafe0c12fb 1-3436
+momentum_backtest/output/research/archive_flat/compare_dual_momentum_variants/rules.txt
+  s_7547295703ceb0::t_1f96be40d7c452 1-9
+momentum_backtest/output/research/archive_flat/compare_dual_momentum_variants/summary.csv
+  s_7547295703ceb0::t_d9c3f30959c2ee 1-4
+momentum_backtest/output/research/archive_flat/compare_dual_momentum_variants/threshold_dual_momentum_nav.csv
+  s_7547295703ceb0::t_69c1e50f94a82f 1-3436
+momentum_backtest/output/research/archive_flat/compare_dual_momentum_variants/threshold_dual_momentum_trades.csv
+  s_7547295703ceb0::t_ad1263be634e57 1-1101
+momentum_backtest/output/research/archive_flat/compare_dynamic_thresholds/asym_045_06_nav.csv
+  s_7547295703ceb0::t_5d54acf989499c 1-3436
+momentum_backtest/output/research/archive_flat/compare_dynamic_thresholds/baseline_fixed_05_nav.csv
+  s_7547295703ceb0::t_8ec06c06c4868b 1-3436
+momentum_backtest/output/research/archive_flat/compare_dynamic_thresholds/nav_compare.csv
+  s_7547295703ceb0::t_acd790e53cdc6c 1-3436
+momentum_backtest/output/research/archive_flat/compare_dynamic_thresholds/summary.csv
+  s_7547295703ceb0::t_0b5d62cc85a8f4 1-7
+momentum_backtest/output/research/archive_flat/compare_dynamic_thresholds/weak_step_06_relaxed_nav.csv
+  s_7547295703ceb0::t_2e4309633c1ba4 1-3436
+momentum_backtest/output/research/archive_flat/compare_dynamic_thresholds/weak_step_06_strict_nav.csv
+  s_7547295703ceb0::t_e49161db1d096b 1-3436
+momentum_backtest/output/research/archive_flat/compare_dynamic_thresholds/weak_tiered_060_nav.csv
+  s_7547295703ceb0::t_3379a713ae6a79 1-3436
+momentum_backtest/output/research/archive_flat/compare_dynamic_thresholds/weak_tiered_065_nav.csv
+  s_7547295703ceb0::t_bbee0bfc958b57 1-3436
+momentum_backtest/output/research/archive_flat/compare_energy_income_candidates/nav_compare.csv
+  s_7547295703ceb0::t_7e363bc43f6b3f 1-753
+momentum_backtest/output/research/archive_flat/compare_energy_income_candidates/skipped_variants.csv
+  s_7547295703ceb0::t_7dc4cb8ed3e7ec 1-5
+momentum_backtest/output/research/archive_flat/compare_energy_income_candidates/summary.csv
+  s_7547295703ceb0::t_7bbac6b3cbafc8 1-3
+momentum_backtest/output/research/archive_flat/compare_joint_treasury_trigger_search/best.json
+  s_7547295703ceb0::t_0977a5db8dcfcf 1-144
+momentum_backtest/output/research/archive_flat/compare_joint_treasury_trigger_search/nav_compare.csv
+  s_7547295703ceb0::t_cdc0b430bd502d 1-3436
+momentum_backtest/output/research/archive_flat/compare_joint_treasury_trigger_search/summary.csv
+  s_7547295703ceb0::t_ab4cdbc913864e 1-50
+momentum_backtest/output/research/archive_flat/compare_lookback_range/nav_compare.csv
+  s_7547295703ceb0::t_fd48630bd75d3d 1-3436
+momentum_backtest/output/research/archive_flat/compare_lookback_range/summary.csv
+  s_7547295703ceb0::t_97cbb0de12b79b 1-12
+momentum_backtest/output/research/archive_flat/compare_more_candidates/nav_compare.csv
+  s_7547295703ceb0::t_b5d86647e0823c 1-753
+momentum_backtest/output/research/archive_flat/compare_more_candidates/skipped_variants.csv
+  s_7547295703ceb0::t_f1909047d7a9aa 1-4
+momentum_backtest/output/research/archive_flat/compare_more_candidates/summary.csv
+  s_7547295703ceb0::t_0dbcdfa240e2f2 1-3
+momentum_backtest/output/research/archive_flat/compare_opportunistic_defensive_cap/nav_compare.csv
+  s_7547295703ceb0::t_8a611c1cce3693 1-3436
+momentum_backtest/output/research/archive_flat/compare_opportunistic_defensive_cap/summary.csv
+  s_7547295703ceb0::t_1f65e9cd83265f 1-110
+momentum_backtest/output/research/archive_flat/compare_overheat_exposure_cap/nav_compare.csv
+  s_7547295703ceb0::t_442c68bdb0dcaf 1-3436
+momentum_backtest/output/research/archive_flat/compare_overheat_exposure_cap/summary.csv
+  s_7547295703ceb0::t_4f9f9e721b57c4 1-5
+momentum_backtest/output/research/archive_flat/compare_regime_mix_pool_variations/nav_compare.csv
+  s_7547295703ceb0::t_32174d0c349158 1-3436
+momentum_backtest/output/research/archive_flat/compare_regime_mix_pool_variations/summary.csv
+  s_7547295703ceb0::t_9a0142d1a42379 1-15
+momentum_backtest/output/research/archive_flat/compare_resource_baseline_with_china_internet/nav_compare.csv
+  s_7547295703ceb0::t_593f7ffc06c12d 1-753
+momentum_backtest/output/research/archive_flat/compare_resource_baseline_with_china_internet/summary.csv
+  s_7547295703ceb0::t_60b01f37e099ce 1-6
+momentum_backtest/output/research/archive_flat/compare_simple_bond_overlay/best.json
+  s_7547295703ceb0::t_eda69c7c0c8071 1-465
+momentum_backtest/output/research/archive_flat/compare_simple_bond_overlay/nav_compare.csv
+  s_7547295703ceb0::t_e1548f9f464f79 1-3436
+momentum_backtest/output/research/archive_flat/compare_simple_bond_overlay/summary.csv
+  s_7547295703ceb0::t_3712b2f56338a3 1-67
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/baseline_nav.csv
+  s_7547295703ceb0::t_867c1c62de4b65 1-3436
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/baseline_trades.csv
+  s_7547295703ceb0::t_34413a4a96eb2a 1-1628
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/combo_confirm_tie_volcap_nav.csv
+  s_7547295703ceb0::t_43e0f18662f9af 1-3436
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/combo_confirm_tie_volcap_trades.csv
+  s_7547295703ceb0::t_b923ee84dba466 1-1722
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/confirm60_top2_nav.csv
+  s_7547295703ceb0::t_760794cdf330fe 1-3436
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/confirm60_top2_trades.csv
+  s_7547295703ceb0::t_797b7a1d6fa2f5 1-1628
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/confirm60_top3_nav.csv
+  s_7547295703ceb0::t_d5b43c3f99eadb 1-3436
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/confirm60_top3_trades.csv
+  s_7547295703ceb0::t_6a8e279def8309 1-1692
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/continuous_transition_nav.csv
+  s_7547295703ceb0::t_63083b301a3d65 1-3436
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/continuous_transition_trades.csv
+  s_7547295703ceb0::t_2bc1c6d786f380 1-3321
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/extreme_volcap_nav.csv
+  s_7547295703ceb0::t_1398ad3d29b60f 1-3436
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/extreme_volcap_trades.csv
+  s_7547295703ceb0::t_73f0321765ea80 1-1677
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/leader_margin005_nav.csv
+  s_7547295703ceb0::t_829bebf51c49d4 1-3436
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/leader_margin005_trades.csv
+  s_7547295703ceb0::t_775272ba86002a 1-1573
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/nav_compare.csv
+  s_7547295703ceb0::t_4d2069c1ee38fd 1-3436
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/slope_r2_020_nav.csv
+  s_7547295703ceb0::t_5822ab0e9d936a 1-3436
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/slope_r2_020_trades.csv
+  s_7547295703ceb0::t_782223fe32b101 1-1599
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/summary.csv
+  s_7547295703ceb0::t_24e8a807eedad3 1-10
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/tie_r2_gap005_nav.csv
+  s_7547295703ceb0::t_89b8a13ba7cb87 1-3436
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/tie_r2_gap005_trades.csv
+  s_7547295703ceb0::t_fe1b7a3b7e0a96 1-1604
+momentum_backtest/output/research/archive_flat/compare_strategy_direction_bakeoff/yearly_returns.csv
+  s_7547295703ceb0::t_4caf4ee4ce112b 1-136
+momentum_backtest/output/research/archive_flat/compare_stressbond_dual_objective_refine/best.json
+  s_7547295703ceb0::t_04bdfd2ba44d3b 1-162
+momentum_backtest/output/research/archive_flat/compare_stressbond_dual_objective_refine/nav_compare.csv
+  s_7547295703ceb0::t_493310345d238f 1-3436
+momentum_backtest/output/research/archive_flat/compare_stressbond_dual_objective_refine/summary.csv
+  s_7547295703ceb0::t_420857bd2a8f6d 1-137
+momentum_backtest/output/research/archive_flat/compare_stressbond_edge_refine/best.json
+  s_7547295703ceb0::t_0ad9232a35922e 1-216
+momentum_backtest/output/research/archive_flat/compare_stressbond_edge_refine/nav_compare.csv
+  s_7547295703ceb0::t_75e89b54a00c4a 1-3436
+momentum_backtest/output/research/archive_flat/compare_stressbond_edge_refine/summary.csv
+  s_7547295703ceb0::t_bed45b82b3ae96 1-191
+momentum_backtest/output/research/archive_flat/compare_stressbond_nearmiss_repair/best.json
+  s_7547295703ceb0::t_420838251926ba 1-1216
+momentum_backtest/output/research/archive_flat/compare_stressbond_nearmiss_repair/nav_compare.csv
+  s_7547295703ceb0::t_a03448038b0079 1-3436
+momentum_backtest/output/research/archive_flat/compare_stressbond_nearmiss_repair/summary.csv
+  s_7547295703ceb0::t_cc06d7b61dfa77 1-34
+momentum_backtest/output/research/archive_flat/compare_stressbond_persistence_current/best.json
+  s_7547295703ceb0::t_262268fb40277a 1-63
+momentum_backtest/output/research/archive_flat/compare_stressbond_persistence_current/nav_compare.csv
+  s_7547295703ceb0::t_2ec232a305a8b0 1-3436
+momentum_backtest/output/research/archive_flat/compare_stressbond_persistence_current/summary.csv
+  s_7547295703ceb0::t_f832ad5c8655f5 1-38
+momentum_backtest/output/research/archive_flat/compare_stressbond_smooth_guard/best.json
+  s_7547295703ceb0::t_be64280dbe09c8 1-270
+momentum_backtest/output/research/archive_flat/compare_stressbond_smooth_guard/nav_compare.csv
+  s_7547295703ceb0::t_31d0ce86ef28be 1-3436
+momentum_backtest/output/research/archive_flat/compare_stressbond_smooth_guard/summary.csv
+  s_7547295703ceb0::t_0f0921533728dd 1-245
+momentum_backtest/output/research/archive_flat/compare_stressbond_trigger_refine_current/best.json
+  s_7547295703ceb0::t_f93066082a009a 1-81
+momentum_backtest/output/research/archive_flat/compare_stressbond_trigger_refine_current/nav_compare.csv
+  s_7547295703ceb0::t_7a986d2b419053 1-3436
+momentum_backtest/output/research/archive_flat/compare_stressbond_trigger_refine_current/summary.csv
+  s_7547295703ceb0::t_8bf1c0fa0eeb37 1-56
+momentum_backtest/output/research/archive_flat/compare_stressbond_trigger_refine_rc184/best.json
+  s_7547295703ceb0::t_69a5a9930752ed 1-81
+momentum_backtest/output/research/archive_flat/compare_stressbond_trigger_refine_rc184/nav_compare.csv
+  s_7547295703ceb0::t_a82ef9dee015dd 1-3436
+momentum_backtest/output/research/archive_flat/compare_stressbond_trigger_refine_rc184/summary.csv
+  s_7547295703ceb0::t_0f579098f217f1 1-56
+momentum_backtest/output/research/archive_flat/compare_stressbond_vm_refine/best.json
+  s_7547295703ceb0::t_0625fe3262fc9c 1-135
+momentum_backtest/output/research/archive_flat/compare_stressbond_vm_refine/nav_compare.csv
+  s_7547295703ceb0::t_2e40b33faadefd 1-3436
+momentum_backtest/output/research/archive_flat/compare_stressbond_vm_refine/summary.csv
+  s_7547295703ceb0::t_47be8c93bc3ebe 1-110
+momentum_backtest/output/research/archive_flat/compare_structural_optimizations/nav_compare.csv
+  s_7547295703ceb0::t_cf79cff395dcb0 1-3436
+momentum_backtest/output/research/archive_flat/compare_structural_optimizations/summary.csv
+  s_7547295703ceb0::t_346dabc63f6a46 1-4
+momentum_backtest/output/research/archive_flat/compare_two_tier_defense/best.json
+  s_7547295703ceb0::t_cfc9f5f78db9f2 1-219
+momentum_backtest/output/research/archive_flat/compare_two_tier_defense/nav_compare.csv
+  s_7547295703ceb0::t_99105e3725d142 1-3436
+momentum_backtest/output/research/archive_flat/compare_two_tier_defense/summary.csv
+  s_7547295703ceb0::t_9df39893eb80af 1-194
+momentum_backtest/output/research/archive_flat/compare_zijin_candidate_601899/base_current_baseline_nav.csv
+  s_7547295703ceb0::t_b76fc3dd37b1f4 1-3436
+momentum_backtest/output/research/archive_flat/compare_zijin_candidate_601899/base_current_baseline_trades.csv
+  s_7547295703ceb0::t_c9f019a1f94a7e 1-1628
+momentum_backtest/output/research/archive_flat/compare_zijin_candidate_601899/nav_compare.csv
+  s_7547295703ceb0::t_e172b952119577 1-3436
+momentum_backtest/output/research/archive_flat/compare_zijin_candidate_601899/summary.csv
+  s_7547295703ceb0::t_e19ee32ae58b07 1-2
+momentum_backtest/output/research/archive_flat/export_leader_margin_010/backtest_nav.csv
+  s_7547295703ceb0::t_84a730a873204c 1-2428
+momentum_backtest/output/research/archive_flat/export_leader_margin_010/contribution_summary.csv
+  s_7547295703ceb0::t_6d3554e1ff9798 1-10
+momentum_backtest/output/research/archive_flat/export_leader_margin_010/historical_nav.csv
+  s_7547295703ceb0::t_05709185b36cb3 1-2428
+momentum_backtest/output/research/archive_flat/export_leader_margin_010/prices.csv
+  s_7547295703ceb0::t_f244c37aa9d3d2 1-2428
+momentum_backtest/output/research/archive_flat/export_leader_margin_010/selected_etfs.csv
+  s_7547295703ceb0::t_f808f46be7a669 1-10
+momentum_backtest/output/research/archive_flat/export_leader_margin_010/strategy_vs_hs300.csv
+  s_7547295703ceb0::t_535279e772e4cf 1-2428
+momentum_backtest/output/research/archive_flat/export_leader_margin_010/summary.csv
+  s_7547295703ceb0::t_8dc0885673c94e 1-2
+momentum_backtest/output/research/archive_flat/export_leader_margin_010/trades.csv
+  s_7547295703ceb0::t_10c1bc488ed950 1-1214
+momentum_backtest/output/research/archive_flat/export_leader_margin_010/yearly_returns.csv
+  s_7547295703ceb0::t_4263806b12cf53 1-12
+momentum_backtest/output/research/archive_flat/tune_threshold_dual_momentum/best_nav.csv
+  s_7547295703ceb0::t_265cc86c7d541a 1-3436
+momentum_backtest/output/research/archive_flat/tune_threshold_dual_momentum/best_trades.csv
+  s_7547295703ceb0::t_5815228f974ac5 1-1101
+momentum_backtest/output/research/archive_flat/tune_threshold_dual_momentum/nav_compare.csv
+  s_7547295703ceb0::t_a55caa351efe6d 1-3436
+momentum_backtest/output/research/archive_flat/tune_threshold_dual_momentum/summary.csv
+  s_7547295703ceb0::t_83d157e7c7dcaa 1-11
+momentum_backtest/output/research/asset_profit_year_profile.csv
+  s_8ebd05406e1914::t_6093b1bf145371 1-10
+momentum_backtest/output/research/asset_relative_volatility_variants/baseline_nav_detail.csv
+  s_8ebd05406e1914::t_41bbe959fd8300 1-3426
+momentum_backtest/output/research/asset_relative_volatility_variants/baseline_trades.csv
+  s_8ebd05406e1914::t_32a36f748e0ae4 1-1662
+momentum_backtest/output/research/asset_relative_volatility_variants/nav_compare.csv
+  s_8ebd05406e1914::t_dfdfe576018113 1-3426
+momentum_backtest/output/research/asset_relative_volatility_variants/own_vol_pct_cap_nav_detail.csv
+  s_8ebd05406e1914::t_4c2b37abb7f60d 1-3426
+momentum_backtest/output/research/asset_relative_volatility_variants/own_vol_pct_cap_trades.csv
+  s_8ebd05406e1914::t_03d549807ab05a 1-1849
+momentum_backtest/output/research/asset_relative_volatility_variants/own_vol_pct_divisor_nav_detail.csv
+  s_8ebd05406e1914::t_2d9887a3a01a96 1-3426
+momentum_backtest/output/research/asset_relative_volatility_variants/own_vol_pct_divisor_trades.csv
+  s_8ebd05406e1914::t_0d58f4983624d0 1-1674
+momentum_backtest/output/research/asset_relative_volatility_variants/own_vol_pct_penalty_nav_detail.csv
+  s_8ebd05406e1914::t_3b9537927ed6aa 1-3426
+momentum_backtest/output/research/asset_relative_volatility_variants/own_vol_pct_penalty_trades.csv
+  s_8ebd05406e1914::t_67a84c56aa6dcf 1-1666
+momentum_backtest/output/research/asset_relative_volatility_variants/summary.csv
+  s_8ebd05406e1914::t_288a8dce8ba03e 1-5
+momentum_backtest/output/research/asset_relative_volatility_variants/yearly_returns.csv
+  s_8ebd05406e1914::t_af575f56dc0a8a 1-61
+momentum_backtest/output/research/candidate_pool_additions_nav_compare.csv
+  s_7547295703ceb0::t_d1e6fd5d6782fb 1-789
+momentum_backtest/output/research/candidate_pool_additions_summary.csv
+  s_7547295703ceb0::t_477f7eaf1c4269 1-22
+momentum_backtest/output/research/current_best_pool_additions/nav_compare.csv
+  s_7547295703ceb0::t_8dce2b58455894 1-1601
+momentum_backtest/output/research/current_best_pool_additions/summary.csv
+  s_7547295703ceb0::t_7cde873ce9d5bc 1-35
+momentum_backtest/output/research/current_best_pool_additions/valid_additions.csv
+  s_7547295703ceb0::t_7ab67ab7f9fa1f 1
+momentum_backtest/output/research/current_best_pool_additions/valid_pool_changes.csv
+  s_7547295703ceb0::t_7ec6942c128cd2 1
+momentum_backtest/output/research/diversifier_experiments/nav_compare.csv
+  s_8ebd05406e1914::t_52000e02c0d3f1 1-3438
+momentum_backtest/output/research/diversifier_experiments/summary.csv
+  s_8ebd05406e1914::t_345e913027a0a5 1-14
+momentum_backtest/output/research/drop_soymeal_compare.csv
+  s_8ebd05406e1914::t_0e92388f80f11b 1-4
+momentum_backtest/output/research/goal_optimizations/market_volume_proxy.csv
+  s_a97431bcd4e315::t_8e149db75ac889 1-4129
+momentum_backtest/output/research/recommended_candidate_additions_summary.csv
+  s_7547295703ceb0::t_932ede0f291741 1-6
+momentum_backtest/output/research/reduce_core_fine_scan/reduce_core_r80_g003_m10/backtest_nav.csv
+  s_8ebd05406e1914::t_008c6947c1f654 1-3407
+momentum_backtest/output/research/reduce_core_fine_scan/reduce_core_r80_g003_m10/summary.csv
+  s_8ebd05406e1914::t_212f97a2642bd8 1-2
+momentum_backtest/output/research/reduce_core_fine_scan/reduce_core_r80_g003_m10/trades.csv
+  s_8ebd05406e1914::t_8678f240c09349 1-1706
+momentum_backtest/output/research/reduce_core_fine_scan/reduce_core_r95_g003_m10/backtest_nav.csv
+  s_8ebd05406e1914::t_939579e52e9dc3 1-3407
+momentum_backtest/output/research/reduce_core_fine_scan/reduce_core_r95_g003_m10/summary.csv
+  s_8ebd05406e1914::t_308c23fdd0592c 1-2
+momentum_backtest/output/research/reduce_core_fine_scan/reduce_core_r95_g003_m10/trades.csv
+  s_8ebd05406e1914::t_dce94525eda982 1-1706
+momentum_backtest/output/research/reduce_core_fine_scan/summary.csv
+  s_8ebd05406e1914::t_bd215733dac637 1-4
+momentum_backtest/output/research/signal_stability_variants/baseline_trades.csv
+  s_8ebd05406e1914::t_60490b172fd3c6 1-1658
+momentum_backtest/output/research/signal_stability_variants/nav_compare.csv
+  s_8ebd05406e1914::t_20a4ef39b105f4 1-3418
+momentum_backtest/output/research/signal_stability_variants/slope_downvol025_r2_020_trades.csv
+  s_8ebd05406e1914::t_c40fe28f5a0e9e 1-1607
+momentum_backtest/output/research/signal_stability_variants/slope_downvol_025_trades.csv
+  s_8ebd05406e1914::t_837f7b8fdceaa0 1-1613
+momentum_backtest/output/research/signal_stability_variants/slope_downvol_040_trades.csv
+  s_8ebd05406e1914::t_f95c54e64a2c6e 1-1661
+momentum_backtest/output/research/signal_stability_variants/slope_r2_020_trades.csv
+  s_8ebd05406e1914::t_879b50ffc6c329 1-1619
+momentum_backtest/output/research/signal_stability_variants/slope_r2_035_trades.csv
+  s_8ebd05406e1914::t_0412b8b187f12b 1-1616
+momentum_backtest/output/research/signal_stability_variants/slope_vol_015_trades.csv
+  s_8ebd05406e1914::t_bf3da77ab9e3d9 1-1635
+momentum_backtest/output/research/signal_stability_variants/slope_vol_025_trades.csv
+  s_8ebd05406e1914::t_dd2c18869a14fa 1-1730
+momentum_backtest/output/research/signal_stability_variants/summary.csv
+  s_8ebd05406e1914::t_f88c0f9916c2dc 1-9
+momentum_backtest/output/research/signal_stability_variants/yearly_returns.csv
+  s_8ebd05406e1914::t_e7731ad40f73d4 1-121
+momentum_backtest/output/research/similarity_dampening/summary.csv
+  s_8ebd05406e1914::t_4e2ead1ce8a5aa 1-6
+momentum_backtest/output/research/slope_hot_riskcap_candidates/slope_hot_cap70/backtest_nav.csv
+  s_7547295703ceb0::t_3bcffec8ad969f 1-3407
+momentum_backtest/output/research/slope_hot_riskcap_candidates/slope_hot_cap70/summary.csv
+  s_7547295703ceb0::t_0b1f8cb2db4d05 1-2
+momentum_backtest/output/research/slope_hot_riskcap_candidates/slope_hot_cap70/trades.csv
+  s_7547295703ceb0::t_d49391eb19dab7 1-1749
+momentum_backtest/output/research/slope_hot_riskcap_candidates/slope_hot_cap70_only_mom15/backtest_nav.csv
+  s_7547295703ceb0::t_d15e568bf7ce7a 1-3407
+momentum_backtest/output/research/slope_hot_riskcap_candidates/slope_hot_cap70_only_mom15/summary.csv
+  s_7547295703ceb0::t_882ca4fa90f7a7 1-2
+momentum_backtest/output/research/slope_hot_riskcap_candidates/slope_hot_cap70_only_mom15/trades.csv
+  s_7547295703ceb0::t_e4494a2d345016 1-1685
+momentum_backtest/output/research/slope_hot_riskcap_candidates/slope_hot_cap80/backtest_nav.csv
+  s_7547295703ceb0::t_22e71bcb33179f 1-3407
+momentum_backtest/output/research/slope_hot_riskcap_candidates/slope_hot_cap80/summary.csv
+  s_7547295703ceb0::t_2ecf4101ab76d0 1-2
+momentum_backtest/output/research/slope_hot_riskcap_candidates/slope_hot_cap80/trades.csv
+  s_7547295703ceb0::t_27cb4f1a69179b 1-1753
+momentum_backtest/output/research/slope_hot_riskcap_candidates/summary.csv
+  s_7547295703ceb0::t_20c4833c19cccd 1-5
+momentum_backtest/output/research/stage_asset_contribution.csv
+  s_8ebd05406e1914::t_d2e35e041ff00b 1-46
+momentum_backtest/output/research/stage_asset_contribution_detailed.csv
+  s_8ebd05406e1914::t_1fa99bf185630f 1-46
+momentum_backtest/output/research/targeted_stability_guards/baseline_trades.csv
+  s_8ebd05406e1914::t_df89091c345a74 1-1658
+momentum_backtest/output/research/targeted_stability_guards/combo_tie_downvol_overheat_r2_trades.csv
+  s_8ebd05406e1914::t_8ca31a2f3a548d 1-1619
+momentum_backtest/output/research/targeted_stability_guards/combo_tie_r2_overheat_downvol_trades.csv
+  s_8ebd05406e1914::t_71db1cda7dc098 1-1629
+momentum_backtest/output/research/targeted_stability_guards/nav_compare.csv
+  s_8ebd05406e1914::t_0d4f0ab981ff55 1-3418
+momentum_backtest/output/research/targeted_stability_guards/overheat_downvol_rank35_cap20_trades.csv
+  s_8ebd05406e1914::t_2d722a3514f43d 1-1658
+momentum_backtest/output/research/targeted_stability_guards/overheat_r2_rank35_cap20_trades.csv
+  s_8ebd05406e1914::t_911001319796a9 1-1658
+momentum_backtest/output/research/targeted_stability_guards/summary.csv
+  s_8ebd05406e1914::t_225c3feb121563 1-10
+momentum_backtest/output/research/targeted_stability_guards/tie_downvol_gap003_trades.csv
+  s_8ebd05406e1914::t_9ab5d94152974b 1-1625
+momentum_backtest/output/research/targeted_stability_guards/tie_downvol_gap005_trades.csv
+  s_8ebd05406e1914::t_4e553558ed0cf1 1-1619
+momentum_backtest/output/research/targeted_stability_guards/tie_r2_gap003_trades.csv
+  s_8ebd05406e1914::t_1d37dcee456631 1-1644
+momentum_backtest/output/research/targeted_stability_guards/tie_r2_gap005_trades.csv
+  s_8ebd05406e1914::t_8df24d46a2d999 1-1629
+momentum_backtest/output/research/targeted_stability_guards/yearly_returns.csv
+  s_8ebd05406e1914::t_79841320088236 1-136
+momentum_backtest/output/research/top2_split_candidates/summary.csv
+  s_7547295703ceb0::t_a97ac31166dabf 1-5
+momentum_backtest/output/research/top2_split_candidates/top2_split_50_50/backtest_nav.csv
+  s_7547295703ceb0::t_e5485cd8437dbe 1-3407
+momentum_backtest/output/research/top2_split_candidates/top2_split_50_50/summary.csv
+  s_7547295703ceb0::t_258d6c7de3624b 1-2
+momentum_backtest/output/research/top2_split_candidates/top2_split_50_50/trades.csv
+  s_7547295703ceb0::t_c58c71e0178db2 1-1574
+momentum_backtest/output/research/weak_trend_zone_optimizations/summary.csv
+  s_8ebd05406e1914::t_7fa8e06611e10e 1-10
+momentum_backtest/output/research/yearly_asset_contribution.csv
+  s_8ebd05406e1914::t_bba67577597f79 1-136
+momentum_backtest/output/research/yearly_asset_contribution_detailed.csv
+  s_8ebd05406e1914::t_1ea3d5770cebd5 1-136
+momentum_backtest/output/research/yearly_asset_timeline_summary.csv
+  s_8ebd05406e1914::t_630b303fe60753 1-16
+momentum_backtest/pool_change_common.py
+  s_7547295703ceb0::t_e5380f23ef1489 1-98
+momentum_backtest/resource_guard_common.py
+  s_7547295703ceb0::t_499d16e71d6f6c 1-10
+momentum_backtest/runtime-requirements.txt
+  s_a97431bcd4e315::t_83db44146d2a4e 1-8
+momentum_backtest/runtime_env.py
+  s_a97431bcd4e315::t_3dd81f9decd762 44-46
+momentum_backtest/search_utils.py
+  s_7547295703ceb0::t_85d46d6e2efd04 9,20-24,26-30,35,37-43,63-64,67,82-85,135-153,232-313,375-484
+momentum_backtest/strategy_signal_common.py
+  s_7547295703ceb0::t_b2d264685cedc0 1-10
+momentum_backtest/tail_risk_overlay_common.py
+  s_7547295703ceb0::t_3122c98cf29969 1-10
+momentum_backtest/validate_strategy_outputs.py
+  s_7547295703ceb0::t_205fb3b8f8e7aa 13,27,66,106,127,130-132,134,140,143-145,147,228-238,287-290,422-437,1845-1892,1901-2018,2210-2228,2723-2724,2729-2730,2752,2785,2787-2789
+scripts/sync_runtime_and_reload.sh
+  s_a97431bcd4e315::t_1a47c53ca14e6f 6-11,18-61,71,86-94,96,106,149,182,205,213,255,266,268,270,273
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "516efa6636cc1b2b08351add4d880d3b8a618da0",
+  "prompts": {},
+  "sessions": {
+    "s_7547295703ceb0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f63e9-88f3-7d60-9c80-b3a8d06f9bdb",
+        "model": "unknown"
+      },
+      "human_author": "wangyu.remm <wangyu.remm@bytedance.com>"
+    },
+    "s_8ebd05406e1914": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ed4b3-82ac-7100-b56e-10afe95e6df8",
+        "model": "unknown"
+      },
+      "human_author": "wangyu.remm <wangyu.remm@bytedance.com>"
+    },
+    "s_a97431bcd4e315": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f63bf-80ac-71f0-bae1-73f02e35dc91",
+        "model": "unknown"
+      },
+      "human_author": "wangyu.remm <wangyu.remm@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
