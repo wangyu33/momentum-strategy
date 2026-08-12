@@ -31,6 +31,11 @@ try:
 except ImportError:
     from official_baseline import apply_official_baseline_nav_anchor
 
+try:
+    from ...run_backtest import build_official_baseline_summary
+except ImportError:
+    from run_backtest import build_official_baseline_summary
+
 from variant_compare_helpers import (
     append_variant_result,
     build_compare_frame,
@@ -103,7 +108,12 @@ def main() -> int:
         params=base_params,
     )
     baseline_result = apply_official_baseline_nav_anchor(baseline_result)
-    baseline_row = summarize(baseline_result, baseline_trades, selected)
+    baseline_row = build_official_baseline_summary(
+        baseline_result,
+        baseline_trades,
+        selected=selected,
+        include_max_drawdown_integral=True,
+    )
     baseline_row["cash_days"] = int((baseline_result["exposure"] <= 1e-12).sum())
 
     rows: list[dict[str, object]] = []

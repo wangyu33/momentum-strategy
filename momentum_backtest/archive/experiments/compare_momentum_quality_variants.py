@@ -55,6 +55,7 @@ from archive_strategy_common import (
     build_default_strategy_params,
     fetch_histories,
     load_default_strategy_backtest_pool,
+    run_default_strategy_with_params,
 )
 
 
@@ -341,6 +342,17 @@ def run_quality_variant(
     slope_penalty: float = 0.0,
     leader_margin: float = 0.0,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if method == "official":
+        result, trades = run_default_strategy_with_params(
+            prices,
+            selected,
+            params=params,
+            fee_rate=fee_rate,
+            slippage_rate=slippage_rate,
+            market_proxy=proxy,
+        )
+        return apply_official_baseline_nav_anchor(result), trades
+
     base_weights, mixed_momentum, _ = build_base_target_weights_quality(
         prices=prices,
         proxy=proxy,
@@ -388,7 +400,8 @@ def main() -> int:
         proxy_kind="hybrid_breadth_blend",
     )
 
-    variants: list[dict[str, object]] = [{"strategy": "baseline_raw", "method": "raw"}]
+    # archive 对比表里的 baseline_raw 统一指正式锚定基线，避免再和旧的 raw 动量实验口径混淆。
+    variants: list[dict[str, object]] = [{"strategy": "baseline_raw", "method": "official"}]
     if args.slope_grid_only:
         current = args.slope_start
         while current <= args.slope_stop + 1e-12:
@@ -445,8 +458,6 @@ def main() -> int:
             slope_penalty=float(spec.get("slope_penalty", 0.0)),
             leader_margin=float(spec.get("leader_margin", 0.0)),
         )
-        if str(spec["strategy"]) == "baseline_raw":
-            result = apply_official_baseline_nav_anchor(result)
         summary = append_variant_result(
             rows,
             nav_compare,
@@ -490,7 +501,7 @@ def main() -> int:
         ascending=[False, True, False, False],
     )
     plot_lines = [
-        ("baseline_raw", "Baseline Raw", 2.2),
+        ("baseline_raw", "Official Baseline", 2.2),
         ("slope_080", "Slope 0.80", 1.8),
         ("combo_light", "Combo Light", 1.8),
         ("combo_margin", "Combo Margin", 1.8),

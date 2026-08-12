@@ -221,6 +221,21 @@ def build_asset_relative_volatility_percentile(
     return build_asset_relative_state_percentile(vol, lookback=state_lookback)
 
 
+def build_asset_own_momentum_percentile(
+    prices: pd.DataFrame,
+    lookback: int = DEFAULT_LOOKBACK,
+    state_lookback: int = 756,
+    min_periods: int | None = None,
+) -> pd.DataFrame:
+    """计算每个标的当前动量在其自身历史窗口中的分位。"""
+    momentum = prices / prices.shift(lookback) - 1
+    return build_asset_relative_state_percentile(
+        momentum,
+        lookback=state_lookback,
+        min_periods=min_periods,
+    )
+
+
 def build_signal_stability_score(
     prices: pd.DataFrame,
     lookback: int,
@@ -1463,6 +1478,11 @@ def build_default_strategy_params(
         "signal_selected_volatility_cap_start": 1.0,
         "signal_selected_volatility_cap_end": 1.0,
         "signal_selected_volatility_cap_floor": 1.0,
+        "signal_selected_momentum_pct_cap_start": 1.0,
+        "signal_selected_momentum_pct_cap_end": 1.0,
+        "signal_selected_momentum_pct_cap_floor": 1.0,
+        "signal_selected_momentum_pct_lookback": 756,
+        "signal_selected_momentum_pct_min_periods": 120,
     }
 
 
@@ -1583,6 +1603,10 @@ def run_default_strategy_with_params(
         result["absolute_momentum_threshold"] = base_result["absolute_momentum_threshold"].reindex(result.index).ffill()
     if "selected_volatility_cap_triggered" in base_result.columns:
         result["selected_volatility_cap_triggered"] = base_result["selected_volatility_cap_triggered"].reindex(result.index).fillna(False)
+    if "selected_momentum_percentile" in base_result.columns:
+        result["selected_momentum_percentile"] = base_result["selected_momentum_percentile"].reindex(result.index)
+    if "selected_momentum_pct_cap_triggered" in base_result.columns:
+        result["selected_momentum_pct_cap_triggered"] = base_result["selected_momentum_pct_cap_triggered"].reindex(result.index).fillna(False)
     if "extra_cap_triggered" in base_result.columns:
         result["extra_cap_triggered"] = base_result["extra_cap_triggered"].reindex(result.index).fillna(False)
     if "extra_cap_reason" in base_result.columns:
@@ -1917,36 +1941,38 @@ def build_strategy_summary(
     selected: pd.DataFrame | None = None,
     exposure_series: pd.Series | None = None,
     include_max_drawdown_integral: bool = False,
+    official_anchor: bool = False,
 ) -> dict[str, float | int | str]:
     """汇总研究脚本常用绩效指标，统一年化/波动率/夏普等基础口径。"""
-    daily_ret = result["strategy_return"].fillna(0.0)
-    ann_ret = annualized_return(result["nav"])
+    effective_result = apply_official_baseline_nav_anchor(result.copy()) if official_anchor else result
+    daily_ret = effective_result["strategy_return"].fillna(0.0)
+    ann_ret = annualized_return(effective_result["nav"])
     ann_vol = float(daily_ret.std(ddof=0) * (252 ** 0.5))
     sharpe = ann_ret / ann_vol if ann_vol > 0 else float("nan")
-    effective_exposure = exposure_series if exposure_series is not None else result["exposure"]
+    effective_exposure = exposure_series if exposure_series is not None else effective_result["exposure"]
 
     summary: dict[str, float | int | str] = {
-        "total_return": float(result["nav"].iloc[-1] - 1),
+        "total_return": float(effective_result["nav"].iloc[-1] - 1),
         "annualized_return": ann_ret,
         "annualized_volatility": ann_vol,
         "sharpe_rf0": sharpe,
-        "max_drawdown": max_drawdown(result["nav"]),
+        "max_drawdown": max_drawdown(effective_result["nav"]),
         "trade_count": count_trade_days(trades),
         "trade_action_count": int(len(trades)),
         "avg_exposure": float(effective_exposure.mean()),
-        "latest_momentum": float(result["current_momentum"].dropna().iloc[-1]),
+        "latest_momentum": float(effective_result["current_momentum"].dropna().iloc[-1]),
         "latest_exposure": float(effective_exposure.iloc[-1]),
     }
 
     if include_max_drawdown_integral:
-        summary["max_drawdown_integral"] = max_drawdown_integral(result["nav"])
-        summary["max_drawdown_episode_integral"] = max_drawdown_episode_integral(result["nav"])
+        summary["max_drawdown_integral"] = max_drawdown_integral(effective_result["nav"])
+        summary["max_drawdown_episode_integral"] = max_drawdown_episode_integral(effective_result["nav"])
         # 兼容旧字段名的同时，补充更直观的别名，避免把“全历史累计面积”和“单段最大回撤区间面积”混淆。
         summary["full_history_drawdown_integral"] = summary["max_drawdown_integral"]
         summary["worst_drawdown_episode_integral"] = summary["max_drawdown_episode_integral"]
 
     if selected is not None:
-        holding_series = result["holding"].dropna()
+        holding_series = effective_result["holding"].dropna()
         latest_holding = normalize_code(holding_series.iloc[-1]) if not holding_series.empty else ""
         latest_theme = ""
         latest_name = ""
@@ -1958,9 +1984,28 @@ def build_strategy_summary(
         summary["latest_holding_code"] = latest_holding
         summary["latest_holding_theme"] = latest_theme
         summary["latest_holding_name"] = latest_name
-        summary["latest_portfolio"] = get_latest_portfolio_text(selected, result)
+        summary["latest_portfolio"] = get_latest_portfolio_text(selected, effective_result)
 
     return summary
+
+
+def build_official_baseline_summary(
+    result: pd.DataFrame,
+    trades: pd.DataFrame,
+    *,
+    selected: pd.DataFrame | None = None,
+    exposure_series: pd.Series | None = None,
+    include_max_drawdown_integral: bool = False,
+) -> dict[str, float | int | str]:
+    """统一输出线上官方基线口径的摘要。"""
+    return build_strategy_summary(
+        result,
+        trades,
+        selected=selected,
+        exposure_series=exposure_series,
+        include_max_drawdown_integral=include_max_drawdown_integral,
+        official_anchor=True,
+    )
 
 
 def build_benchmark_nav(prices: pd.DataFrame, benchmark_code: str = "510300") -> pd.Series:
@@ -2465,6 +2510,7 @@ def print_summary(
             trades,
             selected=selected,
             include_max_drawdown_integral=True,
+            official_anchor=(strategy_name == DEFAULT_STRATEGY_NAME),
         ),
         "avg_trade_cost_rate": float(result["trade_cost_rate"][result["trade_cost_rate"] > 0].mean() if (result["trade_cost_rate"] > 0).any() else 0.0),
     }

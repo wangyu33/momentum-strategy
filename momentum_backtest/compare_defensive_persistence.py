@@ -51,6 +51,7 @@ from run_backtest import (
     DEFAULT_FEE_RATE,
     DEFAULT_SLIPPAGE_RATE,
     RESEARCH_OUTPUT_DIR,
+    build_official_baseline_summary,
     ensure_output_dirs,
     fetch_histories,
     load_fixed_etf_pool,
@@ -259,7 +260,12 @@ def main() -> int:
         fee_rate=args.fee_rate,
         slippage_rate=args.slippage_rate,
     )
-    baseline_summary = summarize(baseline_result, baseline_trades, baseline_selected)
+    baseline_summary = build_official_baseline_summary(
+        baseline_result,
+        baseline_trades,
+        selected=baseline_selected,
+        include_max_drawdown_integral=True,
+    )
     baseline_summary["strategy"] = overlay_context["strategy"]
     rows.append(baseline_summary)
     nav_compare[f"{overlay_context['strategy']}_nav"] = baseline_result["nav"]

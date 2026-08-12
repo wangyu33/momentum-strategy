@@ -75,6 +75,7 @@ try:
         DEFAULT_WEAK_TREND_DEFENSIVE_WEIGHT,
         DEFENSIVE_CODES,
         RISK_CODES,
+        build_asset_own_momentum_percentile,
         build_asset_relative_volatility_percentile,
         build_signal_stability_score,
         build_top2_close_risk_flag,
@@ -93,6 +94,7 @@ except ImportError:
         DEFAULT_WEAK_TREND_DEFENSIVE_WEIGHT,
         DEFENSIVE_CODES,
         RISK_CODES,
+        build_asset_own_momentum_percentile,
         build_asset_relative_volatility_percentile,
         build_signal_stability_score,
         build_top2_close_risk_flag,
@@ -331,6 +333,7 @@ def build_official_target_weights(
         risk_codes=[str(code) for code in params.get("risk_codes", RISK_CODES)],
         defensive_codes=[str(code) for code in params.get("defensive_codes", DEFENSIVE_CODES)],
     )
+    active_signal_codes = list(dict.fromkeys([*active_risk_codes, *active_defensive_codes]))
     transition_mode = str(params.get("regime_transition_mode", "step"))
     transition_start_cut = float(params.get("regime_transition_start_cut", 0.0))
     transition_end_cut = float(params.get("regime_transition_end_cut", DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD))
@@ -454,6 +457,10 @@ def build_official_target_weights(
 
     selected_volatility_rank = pd.Series(index=prices.index, dtype="float64", name="selected_volatility_rank")
     selected_volatility_cap_triggered = pd.Series(False, index=prices.index, dtype=bool, name="selected_volatility_cap_triggered")
+    selected_momentum_percentile = pd.Series(index=prices.index, dtype="float64", name="selected_momentum_percentile")
+    selected_momentum_pct_cap_triggered = pd.Series(False, index=prices.index, dtype=bool, name="selected_momentum_pct_cap_triggered")
+    preliminary_result = None
+    preliminary_signal = None
     vol_cap_start = float(params.get("signal_selected_volatility_cap_start", 1.0))
     vol_cap_end = float(params.get("signal_selected_volatility_cap_end", 1.0))
     vol_cap_floor = float(params.get("signal_selected_volatility_cap_floor", 1.0))
@@ -471,12 +478,12 @@ def build_official_target_weights(
             DEFAULT_FEE_RATE,
             DEFAULT_SLIPPAGE_RATE,
         )
+        preliminary_signal = preliminary_result["signal"].astype("object")
         signal_volatility_rank = build_asset_relative_volatility_percentile(
             prices[active_risk_codes],
             vol_window=20,
             state_lookback=int(params.get("signal_volatility_state_lookback", 252)),
         )
-        preliminary_signal = preliminary_result["signal"].astype("object")
         for dt_idx in prices.index:
             signal_code = preliminary_signal.loc[dt_idx]
             if pd.isna(signal_code) or signal_code not in signal_volatility_rank.columns:
@@ -502,6 +509,60 @@ def build_official_target_weights(
                     scale_mask, active_risk_codes
                 ].mul(scale.loc[scale_mask], axis=0)
 
+    momentum_pct_cap_start = float(params.get("signal_selected_momentum_pct_cap_start", 1.0))
+    momentum_pct_cap_end = float(params.get("signal_selected_momentum_pct_cap_end", 1.0))
+    momentum_pct_cap_floor = float(params.get("signal_selected_momentum_pct_cap_floor", 1.0))
+    if momentum_pct_cap_floor <= 0 or momentum_pct_cap_floor > 1.0:
+        raise ValueError("signal_selected_momentum_pct_cap_floor must be within (0, 1]")
+    if momentum_pct_cap_start < 1.0 or momentum_pct_cap_end < 1.0:
+        if momentum_pct_cap_end < momentum_pct_cap_start:
+            raise ValueError("signal_selected_momentum_pct_cap_end must be >= signal_selected_momentum_pct_cap_start")
+
+        if preliminary_result is None:
+            preliminary_result, _ = run_target_weights_strategy(
+                prices,
+                pd.DataFrame({"code": list(prices.columns), "theme": list(prices.columns), "name": list(prices.columns)}),
+                capped_target_weights,
+                mixed_momentum,
+                DEFAULT_FEE_RATE,
+                DEFAULT_SLIPPAGE_RATE,
+            )
+            preliminary_signal = preliminary_result["signal"].astype("object")
+
+        signal_momentum_percentile = build_asset_own_momentum_percentile(
+            prices[active_signal_codes],
+            lookback=25,
+            state_lookback=int(params.get("signal_selected_momentum_pct_lookback", 756)),
+            min_periods=int(params.get("signal_selected_momentum_pct_min_periods", 120)),
+        )
+        for dt_idx in prices.index:
+            signal_code = preliminary_signal.loc[dt_idx]
+            if pd.isna(signal_code) or signal_code not in signal_momentum_percentile.columns:
+                continue
+            selected_momentum_percentile.loc[dt_idx] = float(signal_momentum_percentile.loc[dt_idx, str(signal_code)])
+
+        total_weight_before_momentum_pct_cap = capped_target_weights.sum(axis=1)
+        high_momentum_pct_mask = selected_momentum_percentile >= momentum_pct_cap_start
+        if high_momentum_pct_mask.any():
+            cap_series = pd.Series(1.0, index=prices.index, dtype="float64")
+            if momentum_pct_cap_end > momentum_pct_cap_start:
+                progress = (
+                    (selected_momentum_percentile.loc[high_momentum_pct_mask] - momentum_pct_cap_start)
+                    / (momentum_pct_cap_end - momentum_pct_cap_start)
+                ).clip(lower=0.0, upper=1.0)
+                cap_series.loc[high_momentum_pct_mask] = 1.0 + (momentum_pct_cap_floor - 1.0) * progress
+            else:
+                cap_series.loc[high_momentum_pct_mask] = momentum_pct_cap_floor
+
+            scale_mask = high_momentum_pct_mask & (total_weight_before_momentum_pct_cap > cap_series)
+            selected_momentum_pct_cap_triggered.loc[scale_mask] = True
+            if scale_mask.any():
+                scale = pd.Series(1.0, index=prices.index, dtype="float64")
+                scale.loc[scale_mask] = cap_series.loc[scale_mask] / total_weight_before_momentum_pct_cap.loc[scale_mask]
+                capped_target_weights.loc[scale_mask, :] = capped_target_weights.loc[
+                    scale_mask, :
+                ].mul(scale.loc[scale_mask], axis=0)
+
     base_result, _ = run_target_weights_strategy(
         prices,
         pd.DataFrame({"code": list(prices.columns), "theme": list(prices.columns), "name": list(prices.columns)}),
@@ -517,6 +578,8 @@ def build_official_target_weights(
     base_result["top2_close_risk_cap"] = close_risk_cap
     base_result["selected_volatility_rank"] = selected_volatility_rank.reindex(base_result.index)
     base_result["selected_volatility_cap_triggered"] = selected_volatility_cap_triggered.reindex(base_result.index).fillna(False)
+    base_result["selected_momentum_percentile"] = selected_momentum_percentile.reindex(base_result.index)
+    base_result["selected_momentum_pct_cap_triggered"] = selected_momentum_pct_cap_triggered.reindex(base_result.index).fillna(False)
     selected_stability_rank = None
     if overheat_stability_method != "none" and overheat_stability_min_rank > 0:
         stability_score = build_signal_stability_score(prices, lookback=25, method=overheat_stability_method)

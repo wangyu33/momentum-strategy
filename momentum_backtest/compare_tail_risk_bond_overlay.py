@@ -66,6 +66,7 @@ from run_backtest import (
     RESEARCH_OUTPUT_DIR,
     RISK_CODES,
     build_default_strategy_params,
+    build_official_baseline_summary,
     resolve_strategy_universe,
     ensure_output_dirs,
     fetch_histories,
@@ -257,7 +258,12 @@ def main() -> int:
         fee_rate=args.fee_rate,
         slippage_rate=args.slippage_rate,
     )
-    baseline_summary = summarize(baseline_result, baseline_trades, baseline_selected)
+    baseline_summary = build_official_baseline_summary(
+        baseline_result,
+        baseline_trades,
+        selected=baseline_selected,
+        include_max_drawdown_integral=True,
+    )
     baseline_summary["strategy"] = str(context["strategy"])
     rows.append(baseline_summary)
     nav_compare[f"{context['strategy']}_nav"] = baseline_result["nav"]

@@ -59,6 +59,7 @@ from run_backtest import (
     DEFAULT_SLIPPAGE_RATE,
     RISK_CODES,
     build_default_strategy_params,
+    build_official_baseline_summary,
     ensure_output_dirs,
     fetch_histories,
     load_default_strategy_backtest_pool,
@@ -307,7 +308,12 @@ def main() -> int:
         slippage_rate=args.slippage_rate,
     )
     baseline_result = apply_official_baseline_nav_anchor(baseline_result)
-    baseline_summary = summarize(baseline_result, baseline_trades, selected)
+    baseline_summary = build_official_baseline_summary(
+        baseline_result,
+        baseline_trades,
+        selected=selected,
+        include_max_drawdown_integral=True,
+    )
     baseline_summary["strategy"] = baseline_name
     baseline_summary["proxy_kind"] = str(current_params["proxy_kind"])
     baseline_summary["volume_ratio_cut"] = current_params["volume_ratio_cut"]

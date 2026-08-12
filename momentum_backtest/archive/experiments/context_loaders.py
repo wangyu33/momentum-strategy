@@ -41,6 +41,11 @@ except ImportError:
     from run_backtest import load_fixed_etf_pool
 
 try:
+    from ...official_baseline import apply_official_baseline_nav_anchor
+except ImportError:
+    from official_baseline import apply_official_baseline_nav_anchor
+
+try:
     from ...search_utils import load_required_strategy_payload
 except ImportError:
     from search_utils import load_required_strategy_payload
@@ -180,6 +185,7 @@ def append_overlay_baseline(
     overlay_context: dict[str, object],
 ) -> dict[str, object]:
     """统一追加覆盖层历史链的 baseline 行。"""
+    baseline_result = apply_official_baseline_nav_anchor(baseline_result)
     return append_variant_result(
         rows,
         nav_compare,

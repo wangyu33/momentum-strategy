@@ -209,3 +209,15 @@
 [2026-07-16 15:30:12] [daily_monitor] webhook sent message 2/2
 [2026-07-16 15:30:12] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
 [2026-07-16 15:30:12] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-07-28 15:12:38] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-07-28 15:12:38] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-08-04 10:58:57] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-08-04 10:58:58] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-08-04 11:00:13] [daily_monitor] snapshot ready: trade_date=2026-08-04, session=盘中, holding=512890, desired=512890, exposure=1.0, slot=0940
+[2026-08-04 11:00:13] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-08-04 11:00:13] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-08-04 11:00:14] [daily_monitor] webhook sent message 1/2
+[2026-08-04 11:00:16] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-08-04 11:00:17] [daily_monitor] webhook sent message 2/2
+[2026-08-04 11:00:17] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-08-04 11:00:17] [daily_monitor] state saved to momentum_backtest/output/monitor/daily_monitor_state.json
