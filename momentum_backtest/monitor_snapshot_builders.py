@@ -273,6 +273,12 @@ def build_position_and_trade_context(
     previous_close_price = price_context["previous_close_price"]
     intraday_price_return = price_context["intraday_price_return"]
     base_exposure = float(base_target_exposure.loc[latest_idx]) if pd.notna(base_target_exposure.loc[latest_idx]) else None
+    selected_momentum_percentile = None
+    if "selected_momentum_percentile" in result.columns and latest_idx in result.index and pd.notna(result.loc[latest_idx, "selected_momentum_percentile"]):
+        selected_momentum_percentile = float(result.loc[latest_idx, "selected_momentum_percentile"])
+    selected_momentum_pct_cap_triggered = False
+    if "selected_momentum_pct_cap_triggered" in result.columns and latest_idx in result.index:
+        selected_momentum_pct_cap_triggered = bool(result.loc[latest_idx, "selected_momentum_pct_cap_triggered"])
 
     top2_close_cap_triggered = False
     top2_close_gap = None
@@ -295,6 +301,10 @@ def build_position_and_trade_context(
     elif base_exposure is not None and desired_exposure is not None and base_exposure - desired_exposure > 1e-12:
         # 兼容旧基线：历史结果未单独落 extra_cap 字段时，仍可从“基础目标仓位 > 当前目标仓位”推断发生了附加压仓。
         extra_cap_triggered = True
+
+    rebalance_threshold_blocked = False
+    if "rebalance_threshold_blocked" in result.columns and latest_idx in result.index:
+        rebalance_threshold_blocked = bool(result.loc[latest_idx, "rebalance_threshold_blocked"])
 
     trade_rows = pd.DataFrame()
     confirmed_trade_date = None
@@ -357,11 +367,14 @@ def build_position_and_trade_context(
         "previous_close_price": previous_close_price,
         "intraday_price_return": intraday_price_return,
         "base_exposure": base_exposure,
+        "selected_momentum_percentile": selected_momentum_percentile,
+        "selected_momentum_pct_cap_triggered": selected_momentum_pct_cap_triggered,
         "top2_close_cap_triggered": top2_close_cap_triggered,
         "top2_close_gap": top2_close_gap,
         "top2_close_risk_cap": top2_close_risk_cap,
         "extra_cap_triggered": extra_cap_triggered,
         "extra_cap_reason": extra_cap_reason,
+        "rebalance_threshold_blocked": rebalance_threshold_blocked,
         "confirmed_trade_date": confirmed_trade_date,
         "trade_previous_allocations": trade_previous_allocations,
         "trade_current_allocations": trade_current_allocations,
@@ -478,11 +491,14 @@ def build_signal_snapshot(
     previous_close_price = position_and_trade["previous_close_price"]
     intraday_price_return = position_and_trade["intraday_price_return"]
     base_exposure = position_and_trade["base_exposure"]
+    selected_momentum_percentile = position_and_trade["selected_momentum_percentile"]
+    selected_momentum_pct_cap_triggered = position_and_trade["selected_momentum_pct_cap_triggered"]
     top2_close_cap_triggered = position_and_trade["top2_close_cap_triggered"]
     top2_close_gap = position_and_trade["top2_close_gap"]
     top2_close_risk_cap = position_and_trade["top2_close_risk_cap"]
     extra_cap_triggered = position_and_trade["extra_cap_triggered"]
     extra_cap_reason = position_and_trade["extra_cap_reason"]
+    rebalance_threshold_blocked = position_and_trade["rebalance_threshold_blocked"]
     confirmed_trade_date = position_and_trade["confirmed_trade_date"]
     trade_previous_allocations = position_and_trade["trade_previous_allocations"]
     trade_current_allocations = position_and_trade["trade_current_allocations"]
@@ -496,11 +512,14 @@ def build_signal_snapshot(
         current_drawdown=current_drawdown,
         base_exposure=base_exposure,
         desired_exposure=desired_exposure,
+        selected_momentum_percentile=selected_momentum_percentile,
+        selected_momentum_pct_cap_triggered=selected_momentum_pct_cap_triggered,
         extra_cap_triggered=extra_cap_triggered,
         extra_cap_reason=extra_cap_reason,
         top2_close_cap_triggered=top2_close_cap_triggered,
         top2_close_gap=top2_close_gap,
         top2_close_risk_cap=top2_close_risk_cap,
+        rebalance_threshold_blocked=rebalance_threshold_blocked,
         theme_map=theme_map,
         name_map=name_map,
         risk_leader=leader_context['risk_leader'],
@@ -528,11 +547,14 @@ def build_signal_snapshot(
         current_drawdown=current_drawdown,
         base_exposure=base_exposure,
         desired_exposure=desired_exposure,
+        selected_momentum_percentile=selected_momentum_percentile,
+        selected_momentum_pct_cap_triggered=selected_momentum_pct_cap_triggered,
         extra_cap_triggered=extra_cap_triggered,
         extra_cap_reason=extra_cap_reason,
         top2_close_cap_triggered=top2_close_cap_triggered,
         top2_close_gap=top2_close_gap,
         top2_close_risk_cap=top2_close_risk_cap,
+        rebalance_threshold_blocked=rebalance_threshold_blocked,
         theme_map=theme_map,
         name_map=name_map,
         risk_leader=leader_context['risk_leader'],
@@ -613,14 +635,17 @@ def build_signal_snapshot(
         historical_avg_mdd_60=risk_context["historical_avg_mdd_60"],
         historical_avg_ret_60_percentile=risk_context["historical_avg_ret_60_percentile"],
         momentum_percentile=risk_context["momentum_percentile"],
+        selected_momentum_percentile=selected_momentum_percentile,
         drawdown_buffer_ratio=risk_context["drawdown_buffer_ratio"],
         entry_advice=risk_context["entry_advice"],
         extra_cap_triggered=extra_cap_triggered,
         extra_cap_label=str(strategy_config["extra_cap_label"]),
         extra_cap_reason=extra_cap_reason,
+        selected_momentum_pct_cap_triggered=selected_momentum_pct_cap_triggered,
         top2_close_cap_triggered=top2_close_cap_triggered,
         top2_close_gap=top2_close_gap,
         top2_close_risk_cap=top2_close_risk_cap,
+        rebalance_threshold_blocked=rebalance_threshold_blocked,
         base_exposure=base_exposure,
         confirmed_trade_date=confirmed_trade_date,
         confirmed_trade_details=confirmed_trade_details,

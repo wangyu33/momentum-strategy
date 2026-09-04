@@ -250,14 +250,17 @@ class SignalSnapshot:
     historical_avg_mdd_60: float | None
     historical_avg_ret_60_percentile: float | None
     momentum_percentile: float | None
+    selected_momentum_percentile: float | None
     drawdown_buffer_ratio: float | None
     entry_advice: str | None
     extra_cap_triggered: bool
     extra_cap_label: str
     extra_cap_reason: str | None
+    selected_momentum_pct_cap_triggered: bool
     top2_close_cap_triggered: bool
     top2_close_gap: float | None
     top2_close_risk_cap: float | None
+    rebalance_threshold_blocked: bool
     base_exposure: float | None
     confirmed_trade_date: str | None
     confirmed_trade_details: str

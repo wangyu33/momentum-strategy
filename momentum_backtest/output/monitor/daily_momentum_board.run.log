@@ -164,3 +164,62 @@
 [2026-07-10 15:37:00] [daily_momentum_board] delivery start message 1/1 pending=webhook
 [2026-07-10 15:37:01] [daily_momentum_board] webhook sent message 1/1
 [2026-07-10 15:37:01] [daily_momentum_board] delivery summary: messages=1, direct_failures=0, webhook_failures=0
+[2026-09-01 14:43:55] [daily_momentum_board] start force=True, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-01 14:44:20] [daily_momentum_board] latest realtime price panel date=2026-09-01, prices: 510300=5.8460, 159949=1.5990, 159954=0.9240, 159941=1.6640, 518880=9.1240, 513880=2.1390, 512890=1.2070, 159985=2.3530, 511260=138.5099
+[2026-09-01 14:44:20] [daily_momentum_board] board ready: trade_date=2026-09-01, latest_price_date=2026-09-01, rows=9
+[2026-09-01 14:44:20] [daily_momentum_board] force mode enabled: state cache will be ignored
+[2026-09-01 14:44:20] [daily_momentum_board] delivery start message 1/1 pending=webhook
+[2026-09-01 14:44:20] [daily_momentum_board] webhook sent message 1/1
+[2026-09-01 14:44:20] [daily_momentum_board] delivery summary: messages=1, direct_failures=0, webhook_failures=0
+[2026-09-01 14:44:20] [daily_momentum_board] state saved to momentum_backtest/output/monitor/daily_momentum_board_state.json
+[2026-09-01 15:30:27] [daily_momentum_board] start force=True, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-01 15:30:48] [daily_momentum_board] latest close price panel date=2026-09-01, prices: 510300=5.8473, 159949=1.5940, 159954=0.9230, 159941=1.6650, 518880=9.1180, 513880=2.1400, 512890=1.2080, 159985=2.3670, 511260=138.5099
+[2026-09-01 15:30:48] [daily_momentum_board] board ready: trade_date=2026-09-01, latest_price_date=2026-09-01, rows=9
+[2026-09-01 15:30:48] [daily_momentum_board] force mode enabled: state cache will be ignored
+[2026-09-01 15:30:48] [daily_momentum_board] delivery start message 1/1 pending=webhook
+[2026-09-01 15:30:49] [daily_momentum_board] webhook sent message 1/1
+[2026-09-01 15:30:49] [daily_momentum_board] delivery summary: messages=1, direct_failures=0, webhook_failures=0
+[2026-09-01 15:30:49] [daily_momentum_board] state saved to momentum_backtest/output/monitor/daily_momentum_board_state.json
+[2026-09-01 15:33:28] [daily_momentum_board] start force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-09-01 15:33:48] [daily_momentum_board] latest close price panel date=2026-09-01, prices: 510300=5.8473, 159949=1.5940, 159954=0.9230, 159941=1.6650, 518880=9.1180, 513880=2.1400, 512890=1.2080, 159985=2.3670, 511260=138.5099
+[2026-09-01 15:33:49] [daily_momentum_board] board ready: trade_date=2026-09-01, latest_price_date=2026-09-01, rows=9
+[2026-09-01 15:33:49] [daily_momentum_board] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-09-01 15:33:49] [daily_momentum_board] delivery start message 1/1 pending=webhook
+[2026-09-01 15:33:50] [daily_momentum_board] webhook sent message 1/1
+[2026-09-01 15:33:50] [daily_momentum_board] delivery summary: messages=1, direct_failures=0, webhook_failures=0
+[2026-09-01 15:35:23] [daily_momentum_board] start force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-09-01 15:35:47] [daily_momentum_board] latest close price panel date=2026-09-01, prices: 510300=5.8473, 159949=1.5940, 159954=0.9230, 159941=1.6650, 518880=9.1180, 513880=2.1400, 512890=1.2080, 159985=2.3670, 511260=138.5099
+[2026-09-01 15:35:47] [daily_momentum_board] board ready: trade_date=2026-09-01, latest_price_date=2026-09-01, rows=9
+[2026-09-01 15:35:47] [daily_momentum_board] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-09-01 15:35:47] [daily_momentum_board] delivery start message 1/1 pending=webhook
+[2026-09-01 15:35:48] [daily_momentum_board] webhook sent message 1/1
+[2026-09-01 15:35:48] [daily_momentum_board] delivery summary: messages=1, direct_failures=0, webhook_failures=0
+[2026-09-01 15:36:27] [daily_momentum_board] start force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-09-01 15:36:49] [daily_momentum_board] latest close price panel date=2026-09-01, prices: 510300=5.8473, 159949=1.5940, 159954=0.9230, 159941=1.6650, 518880=9.1180, 513880=2.1400, 512890=1.2080, 159985=2.3670, 511260=138.5099
+[2026-09-01 15:36:49] [daily_momentum_board] board ready: trade_date=2026-09-01, latest_price_date=2026-09-01, rows=9
+[2026-09-01 15:36:49] [daily_momentum_board] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-09-01 15:36:49] [daily_momentum_board] delivery start message 1/1 pending=webhook
+[2026-09-01 15:36:50] [daily_momentum_board] webhook sent message 1/1
+[2026-09-01 15:36:50] [daily_momentum_board] delivery summary: messages=1, direct_failures=0, webhook_failures=0
+[2026-09-01 15:38:03] [daily_momentum_board] start force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-09-01 15:38:23] [daily_momentum_board] latest close price panel date=2026-09-01, prices: 510300=5.8473, 159949=1.5940, 159954=0.9230, 159941=1.6650, 518880=9.1180, 513880=2.1400, 512890=1.2080, 159985=2.3670, 511260=138.5099
+[2026-09-01 15:38:24] [daily_momentum_board] board ready: trade_date=2026-09-01, latest_price_date=2026-09-01, rows=9
+[2026-09-01 15:38:24] [daily_momentum_board] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-09-01 15:38:24] [daily_momentum_board] delivery start message 1/1 pending=webhook
+[2026-09-01 15:38:24] [daily_momentum_board] webhook sent message 1/1
+[2026-09-01 15:38:25] [daily_momentum_board] delivery summary: messages=1, direct_failures=0, webhook_failures=0
+[2026-09-01 15:39:46] [daily_momentum_board] start force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-09-01 15:40:09] [daily_momentum_board] latest close price panel date=2026-09-01, prices: 510300=5.8473, 159949=1.5940, 159954=0.9230, 159941=1.6650, 518880=9.1180, 513880=2.1400, 512890=1.2080, 159985=2.3670, 511260=138.5099
+[2026-09-01 15:40:10] [daily_momentum_board] board ready: trade_date=2026-09-01, latest_price_date=2026-09-01, rows=9
+[2026-09-01 15:40:10] [daily_momentum_board] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-09-01 15:40:10] [daily_momentum_board] delivery start message 1/1 pending=webhook
+[2026-09-01 15:40:11] [daily_momentum_board] webhook sent message 1/1
+[2026-09-01 15:40:11] [daily_momentum_board] delivery summary: messages=1, direct_failures=0, webhook_failures=0
+[2026-09-04 10:46:47] [daily_momentum_board] start force=True, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-04 10:47:13] [daily_momentum_board] latest realtime price panel date=2026-09-04, prices: 510300=5.8048, 159949=1.5670, 159954=0.9370, 159941=1.6560, 518880=9.1990, 513880=2.1260, 512890=1.2090, 159985=2.4110, 511260=138.6803
+[2026-09-04 10:47:13] [daily_momentum_board] board ready: trade_date=2026-09-04, latest_price_date=2026-09-04, rows=9
+[2026-09-04 10:47:13] [daily_momentum_board] force mode enabled: state cache will be ignored
+[2026-09-04 10:47:13] [daily_momentum_board] delivery start message 1/1 pending=webhook
+[2026-09-04 10:47:14] [daily_momentum_board] webhook sent message 1/1
+[2026-09-04 10:47:14] [daily_momentum_board] delivery summary: messages=1, direct_failures=0, webhook_failures=0
+[2026-09-04 10:47:14] [daily_momentum_board] state saved to momentum_backtest/output/monitor/daily_momentum_board_state.json

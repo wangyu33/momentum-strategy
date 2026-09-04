@@ -221,3 +221,62 @@
 [2026-08-04 11:00:17] [daily_monitor] webhook sent message 2/2
 [2026-08-04 11:00:17] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
 [2026-08-04 11:00:17] [daily_monitor] state saved to momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-08-20 14:49:35] [daily_monitor] failed to fetch raw close for 510300: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/sh510300/hisdata_klc2/klc_kl.js (Caused by NameResolutionError("HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)"))
+[2026-08-20 14:49:35] [daily_monitor] failed to fetch raw close for 159949: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/sz159949/hisdata_klc2/klc_kl.js (Caused by NameResolutionError("HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)"))
+[2026-08-20 14:49:35] [daily_monitor] failed to fetch raw close for 159954: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/sz159954/hisdata_klc2/klc_kl.js (Caused by NameResolutionError("HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)"))
+[2026-08-20 14:49:35] [daily_monitor] failed to fetch raw close for 159941: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/sz159941/hisdata_klc2/klc_kl.js (Caused by NameResolutionError("HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)"))
+[2026-08-20 14:49:35] [daily_monitor] failed to fetch raw close for 518880: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/sh518880/hisdata_klc2/klc_kl.js (Caused by NameResolutionError("HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)"))
+[2026-08-20 14:49:35] [daily_monitor] failed to fetch raw close for 513880: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/sh513880/hisdata_klc2/klc_kl.js (Caused by NameResolutionError("HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)"))
+[2026-08-20 14:49:35] [daily_monitor] failed to fetch raw close for 512890: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/sh512890/hisdata_klc2/klc_kl.js (Caused by NameResolutionError("HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)"))
+[2026-08-20 14:49:35] [daily_monitor] failed to fetch raw close for 159985: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/sz159985/hisdata_klc2/klc_kl.js (Caused by NameResolutionError("HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)"))
+[2026-08-20 14:49:35] [daily_monitor] failed to fetch raw close for 511260: HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/sh511260/hisdata_klc2/klc_kl.js (Caused by NameResolutionError("HTTPSConnection(host='finance.sina.com.cn', port=443): Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)"))
+[2026-09-01 14:40:50] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-01 14:40:50] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-01 14:42:03] [daily_monitor] snapshot ready: trade_date=2026-09-01, session=盘中, holding=518880, desired=513880, exposure=0.8, slot=1210
+[2026-09-01 14:42:03] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-09-01 14:42:03] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-09-01 14:42:05] [daily_monitor] webhook sent message 1/2
+[2026-09-01 14:42:06] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-09-01 14:42:08] [daily_monitor] webhook sent message 2/2
+[2026-09-01 14:42:08] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-09-01 14:42:08] [daily_monitor] state saved to momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-01 15:24:37] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-09-01 15:24:37] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-01 15:25:58] [daily_monitor] snapshot ready: trade_date=2026-09-01, session=收盘后, holding=513880, desired=513880, exposure=0.7, slot=1450
+[2026-09-01 15:25:58] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-09-01 15:25:58] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-09-01 15:25:59] [daily_monitor] webhook sent message 1/2
+[2026-09-01 15:26:01] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-09-01 15:26:02] [daily_monitor] webhook sent message 2/2
+[2026-09-01 15:26:02] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-09-01 15:26:02] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-09-01 15:31:27] [daily_monitor] start strategy=default, force=False, preview_send=True, debug=False, disable_direct_feishu=True
+[2026-09-01 15:31:27] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-01 15:32:35] [daily_monitor] snapshot ready: trade_date=2026-09-01, session=收盘后, holding=513880, desired=513880, exposure=0.7, slot=1450
+[2026-09-01 15:32:35] [daily_monitor] preview_send mode enabled: skip state read/write and duplicate suppression
+[2026-09-01 15:32:35] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-09-01 15:32:37] [daily_monitor] webhook sent message 1/2
+[2026-09-01 15:32:38] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-09-01 15:32:39] [daily_monitor] webhook sent message 2/2
+[2026-09-01 15:32:39] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-09-01 15:32:39] [daily_monitor] preview_send mode complete: state file left unchanged
+[2026-09-02 12:12:53] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-02 12:12:53] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-02 12:13:53] [daily_monitor] snapshot ready: trade_date=2026-09-02, session=午间休市, holding=513880, desired=159941, exposure=0.7, slot=1210
+[2026-09-02 12:13:53] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-09-02 12:13:53] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-09-02 12:13:54] [daily_monitor] webhook sent message 1/2
+[2026-09-02 12:13:56] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-09-02 12:13:57] [daily_monitor] webhook sent message 2/2
+[2026-09-02 12:13:57] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-09-02 12:13:57] [daily_monitor] state saved to momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-02 14:55:34] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-02 14:55:34] [daily_monitor] state_file=momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-02 14:56:33] [daily_monitor] snapshot ready: trade_date=2026-09-02, session=盘中, holding=513880, desired=159941, exposure=0.7, slot=1450
+[2026-09-02 14:56:33] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-09-02 14:56:33] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-09-02 14:56:34] [daily_monitor] webhook sent message 1/2
+[2026-09-02 14:56:36] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-09-02 14:56:37] [daily_monitor] webhook sent message 2/2
+[2026-09-02 14:56:37] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-09-02 14:56:37] [daily_monitor] state saved to momentum_backtest/output/monitor/daily_monitor_state.json

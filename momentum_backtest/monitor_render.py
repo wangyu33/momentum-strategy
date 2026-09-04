@@ -182,11 +182,14 @@ def build_confirmed_trade_reason(
     current_drawdown: float | None,
     base_exposure: float | None,
     desired_exposure: float | None,
+    selected_momentum_percentile: float | None,
+    selected_momentum_pct_cap_triggered: bool,
     extra_cap_triggered: bool,
     extra_cap_reason: str | None,
     top2_close_cap_triggered: bool,
     top2_close_gap: float | None,
     top2_close_risk_cap: float | None,
+    rebalance_threshold_blocked: bool,
     theme_map: dict[str, str],
     name_map: dict[str, str],
     risk_leader: str | None = None,
@@ -259,6 +262,18 @@ def build_confirmed_trade_reason(
         current_momentum is None or abs(float(effective_momentum) - float(current_momentum)) >= 1e-6
     ):
         parts.append(f"策略热度 {format_ratio_percent(effective_momentum, digits=2)}")
+    if selected_momentum_percentile is not None:
+        parts.append(f"主信号历史动量分位 {format_ratio_percent(selected_momentum_percentile, digits=1)}")
+
+    if (
+        selected_momentum_pct_cap_triggered
+        and base_exposure is not None
+        and desired_exposure is not None
+        and base_exposure - desired_exposure > 1e-12
+    ):
+        parts.append(
+            f"命中历史动量分位控仓，因此把总仓位从 {format_allocation_percent(base_exposure)} 下调到 {format_allocation_percent(desired_exposure)}"
+        )
 
     if top2_close_cap_triggered:
         close_gap = top2_close_gap if top2_close_gap is not None else DEFAULT_CLOSE_TOP2_GAP
@@ -304,6 +319,9 @@ def build_confirmed_trade_reason(
                     desired_exposure=desired_exposure,
                 )
             )
+
+    if rebalance_threshold_blocked:
+        parts.append("目标组合变化不足最小调仓阈值，本次忽略小幅微调")
 
     return "；".join(parts) if parts else "沿用最新确认收盘组合，无额外说明"
 
@@ -394,6 +412,8 @@ def format_market_message(snapshot: Any) -> str:
     scorecard_parts: list[str] = []
     if snapshot.momentum_percentile is not None:
         scorecard_parts.append(f"动量分位 {format_ratio_percent(snapshot.momentum_percentile, digits=1)}")
+    if getattr(snapshot, "selected_momentum_percentile", None) is not None:
+        scorecard_parts.append(f"主信号分位 {format_ratio_percent(snapshot.selected_momentum_percentile, digits=1)}")
     if snapshot.drawdown_buffer_ratio is not None:
         scorecard_parts.append(f"回撤进度 {format_ratio_percent(snapshot.drawdown_buffer_ratio, digits=1)}")
     if snapshot.historical_avg_ret_60 is not None:
@@ -447,8 +467,14 @@ def format_market_message(snapshot: Any) -> str:
         close_gap = snapshot.top2_close_gap if snapshot.top2_close_gap is not None else DEFAULT_CLOSE_TOP2_GAP
         close_cap = snapshot.top2_close_risk_cap if snapshot.top2_close_risk_cap is not None else DEFAULT_CLOSE_TOP2_RISK_CAP
         lines.append(f"命中接近降仓: 是 (前二信号质量差<={format_ratio_percent(close_gap, digits=1)}, 总风险仓上限 {format_allocation_percent(close_cap)})")
+    if getattr(snapshot, "selected_momentum_pct_cap_triggered", False) and snapshot.base_exposure is not None and snapshot.desired_exposure is not None:
+        lines.append(
+            f"命中历史分位控仓: 是 (主信号分位 {format_ratio_percent(snapshot.selected_momentum_percentile, digits=1)}, 总仓位 {format_allocation_percent(snapshot.base_exposure)} -> {format_allocation_percent(snapshot.desired_exposure)})"
+        )
     if snapshot.extra_cap_triggered:
         lines.append(f"{snapshot.extra_cap_label}: 是 ({extra_cap_detail})")
+    if getattr(snapshot, "rebalance_threshold_blocked", False):
+        lines.append("最小调仓阈值: 已拦截小幅微调")
     return "\n".join(lines)
 
 
@@ -523,6 +549,8 @@ def build_market_card(snapshot: Any) -> dict[str, Any]:
         f"回撤进度 {drawdown_buffer_text}",
         f"60日期望 {expectation_text}",
     ]
+    if getattr(snapshot, "selected_momentum_percentile", None) is not None:
+        risk_scorecard_parts.insert(1, f"主信号分位 {format_ratio_percent(snapshot.selected_momentum_percentile, digits=1)}")
     if snapshot.historical_avg_ret_60_percentile is not None:
         risk_scorecard_parts[-1] += f" / 分位 {expectation_percentile_text}"
     risk_scorecard = "，".join(risk_scorecard_parts)
@@ -575,7 +603,7 @@ def build_market_card(snapshot: Any) -> dict[str, Any]:
             {"tag": "hr"},
             {"tag": "markdown", "content": f"**弱趋势切换**\n{weak_trend_switch_line}"},
         ])
-    if snapshot.top2_close_cap_triggered or snapshot.extra_cap_triggered:
+    if snapshot.top2_close_cap_triggered or snapshot.extra_cap_triggered or getattr(snapshot, "selected_momentum_pct_cap_triggered", False) or getattr(snapshot, "rebalance_threshold_blocked", False):
         cap_parts: list[str] = []
         if snapshot.top2_close_cap_triggered:
             close_gap = snapshot.top2_close_gap if snapshot.top2_close_gap is not None else DEFAULT_CLOSE_TOP2_GAP
@@ -583,11 +611,17 @@ def build_market_card(snapshot: Any) -> dict[str, Any]:
             cap_parts.append(
                 f"前二信号接近，质量差<={format_ratio_percent(close_gap, digits=1)}，风险仓上限 {format_allocation_percent(close_cap)}"
             )
+        if getattr(snapshot, "selected_momentum_pct_cap_triggered", False) and snapshot.base_exposure is not None and snapshot.desired_exposure is not None:
+            cap_parts.append(
+                f"历史动量分位控仓：主信号分位 {format_ratio_percent(snapshot.selected_momentum_percentile, digits=1)}，总仓位 {format_allocation_percent(snapshot.base_exposure)} -> {format_allocation_percent(snapshot.desired_exposure)}"
+            )
         if snapshot.extra_cap_triggered and snapshot.base_exposure is not None and snapshot.desired_exposure is not None:
             cap_parts.append(
                 f"{snapshot.extra_cap_label}: "
                 f"{describe_extra_cap_reason(snapshot.extra_cap_reason, base_exposure=snapshot.base_exposure, desired_exposure=snapshot.desired_exposure)}"
             )
+        if getattr(snapshot, "rebalance_threshold_blocked", False):
+            cap_parts.append("最小调仓阈值已拦截小幅微调")
         elements.extend([
             {"tag": "hr"},
             {"tag": "markdown", "content": f"**风控动作**\n" + "\n".join(f"- {part}" for part in cap_parts)},

@@ -509,12 +509,13 @@ def build_official_target_weights(
                     scale_mask, active_risk_codes
                 ].mul(scale.loc[scale_mask], axis=0)
 
+    momentum_pct_cap_stage = str(params.get("signal_selected_momentum_pct_cap_stage", "core"))
     momentum_pct_cap_start = float(params.get("signal_selected_momentum_pct_cap_start", 1.0))
     momentum_pct_cap_end = float(params.get("signal_selected_momentum_pct_cap_end", 1.0))
     momentum_pct_cap_floor = float(params.get("signal_selected_momentum_pct_cap_floor", 1.0))
     if momentum_pct_cap_floor <= 0 or momentum_pct_cap_floor > 1.0:
         raise ValueError("signal_selected_momentum_pct_cap_floor must be within (0, 1]")
-    if momentum_pct_cap_start < 1.0 or momentum_pct_cap_end < 1.0:
+    if momentum_pct_cap_stage == "core" and (momentum_pct_cap_start < 1.0 or momentum_pct_cap_end < 1.0):
         if momentum_pct_cap_end < momentum_pct_cap_start:
             raise ValueError("signal_selected_momentum_pct_cap_end must be >= signal_selected_momentum_pct_cap_start")
 

@@ -37,6 +37,7 @@ try:
     from .run_backtest import (
         CORE_OUTPUT_DIR,
         MONITOR_OUTPUT_DIR,
+        build_current_etf_momentum_percentile_table,
         ensure_output_dirs,
         is_trading_day,
         load_default_strategy_backtest_pool,
@@ -57,6 +58,7 @@ except ImportError:
     from run_backtest import (
         CORE_OUTPUT_DIR,
         MONITOR_OUTPUT_DIR,
+        build_current_etf_momentum_percentile_table,
         ensure_output_dirs,
         is_trading_day,
         load_default_strategy_backtest_pool,
@@ -145,6 +147,21 @@ def build_board_dataframe(prices: pd.DataFrame, selected_pool: list[dict[str, ob
     board = pd.DataFrame(rows)
     if board.empty:
         return board
+    percentile_snapshot = build_current_etf_momentum_percentile_table(
+        pd.DataFrame(selected_pool),
+        prices,
+        lookback=25,
+    )
+    if not percentile_snapshot.empty:
+        board = board.merge(
+            percentile_snapshot[["code", "price_date", "mom_25_percentile"]],
+            on="code",
+            how="left",
+        )
+    if "price_date" not in board.columns:
+        board["price_date"] = pd.NA
+    if "mom_25_percentile" not in board.columns:
+        board["mom_25_percentile"] = float("nan")
     return board.sort_values(["mom_25"], ascending=False).reset_index(drop=True)
 
 
@@ -168,12 +185,17 @@ def pad_display(text: str, target_width: int) -> str:
 
 def build_board_message(snapshot: MomentumBoardSnapshot, board: pd.DataFrame) -> str:
     labels = [f"{row['code']} {row['theme']}" for _, row in board.iterrows()]
+    values = [
+        f"{format_pct(row['mom_25'])} ({format_pct(row['mom_25_percentile'])})"
+        for _, row in board.iterrows()
+    ]
     rank_width = max(2, len(str(len(board))))
     label_width = max(max(display_width(label) for label in labels), 18) if labels else 18
+    value_width = max(max(display_width(value) for value in values), 8) if values else 8
     header = (
         f"{'排名':>{rank_width}}  "
         f"{pad_display('标的', label_width)}  "
-        f"{'25日':>8}"
+        f"{'25日':>{value_width}}"
     )
     divider = "-" * display_width(header)
     lines = [
@@ -185,10 +207,11 @@ def build_board_message(snapshot: MomentumBoardSnapshot, board: pd.DataFrame) ->
     ]
     for index, row in board.iterrows():
         label = pad_display(labels[index], label_width)
+        value_text = values[index]
         lines.append(
             f"{index + 1:>{rank_width}}  "
             f"{label}  "
-            f"{format_pct(row['mom_25']):>8}"
+            f"{value_text:>{value_width}}"
         )
     return "\n".join(lines)
 
@@ -204,7 +227,10 @@ def build_board_card(snapshot: MomentumBoardSnapshot, board: pd.DataFrame) -> di
                 },
                 {
                     "is_short": True,
-                    "text": {"tag": "lark_md", "content": f"**{format_pct(row['mom_25'])}**"},
+                    "text": {
+                        "tag": "lark_md",
+                        "content": f"**{format_pct(row['mom_25'])} ({format_pct(row['mom_25_percentile'])})**",
+                    },
                 },
             ]
         )
@@ -332,7 +358,7 @@ def main() -> int:
     )
     message = build_board_message(snapshot, board)
     export_board = board.copy()
-    for column in ["mom_25"]:
+    for column in ["mom_25", "mom_25_percentile"]:
         export_board[column] = export_board[column].map(format_pct)
     export_board["price"] = export_board["price"].map(lambda value: f"{value:.4f}")
     write_dataframe_csv_atomic(export_board, BOARD_CSV_FILE, index=False)

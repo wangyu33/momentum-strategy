@@ -236,6 +236,74 @@ def build_asset_own_momentum_percentile(
     )
 
 
+def build_current_etf_momentum_percentile_table(
+    selected: pd.DataFrame,
+    prices: pd.DataFrame,
+    lookback: int = DEFAULT_LOOKBACK,
+    state_lookback: int = 756,
+    min_periods: int | None = 120,
+) -> pd.DataFrame:
+    """生成候选池最新一日的动量与自身历史分位快照。"""
+    columns = [
+        "date",
+        "price_date",
+        "code",
+        "theme",
+        "name",
+        "price",
+        f"mom_{lookback}",
+        f"mom_{lookback}_percentile",
+    ]
+    if prices.empty or selected.empty:
+        return pd.DataFrame(columns=columns)
+
+    momentum = prices / prices.shift(lookback) - 1
+    momentum_percentile = build_asset_own_momentum_percentile(
+        prices,
+        lookback=lookback,
+        state_lookback=state_lookback,
+        min_periods=min_periods,
+    )
+
+    latest_date = prices.index.max()
+    rows: list[dict[str, object]] = []
+    for _, item in selected.iterrows():
+        code = str(item.get("code", "")).strip()
+        if not code or code not in prices.columns:
+            continue
+
+        price_series = pd.to_numeric(prices[code], errors="coerce").dropna()
+        if price_series.empty:
+            continue
+
+        latest_price_date = price_series.index.max()
+        latest_momentum = float("nan")
+        if code in momentum.columns and latest_price_date in momentum.index:
+            latest_momentum = float(momentum.loc[latest_price_date, code])
+
+        latest_percentile = float("nan")
+        if code in momentum_percentile.columns and latest_price_date in momentum_percentile.index:
+            latest_percentile = float(momentum_percentile.loc[latest_price_date, code])
+
+        rows.append(
+            {
+                "date": latest_date.date().isoformat(),
+                "price_date": latest_price_date.date().isoformat(),
+                "code": code,
+                "theme": str(item.get("theme", "")).strip(),
+                "name": str(item.get("name", "")).strip(),
+                "price": float(price_series.loc[latest_price_date]),
+                f"mom_{lookback}": latest_momentum,
+                f"mom_{lookback}_percentile": latest_percentile,
+            }
+        )
+
+    snapshot = pd.DataFrame(rows, columns=columns)
+    if snapshot.empty:
+        return snapshot
+    return snapshot.sort_values([f"mom_{lookback}", "code"], ascending=[False, True]).reset_index(drop=True)
+
+
 def build_signal_stability_score(
     prices: pd.DataFrame,
     lookback: int,
@@ -389,14 +457,12 @@ def default_strategy_param_text(pool_size: int) -> str:
         f"广度<{float(params.get('volume_breadth_cut', DEFAULT_REGIME_MIX_VOLUME_BREADTH_CUT)):.1%}, "
         f"弱量能上限={float(params.get('volume_guard_cap', DEFAULT_REGIME_MIX_VOLUME_GUARD_CAP)):.1%}"
         f"(动量<={float(params.get('volume_guard_momentum_ceiling', DEFAULT_REGIME_MIX_VOLUME_GUARD_MOMENTUM_CEILING)):.0%}), "
-        f"预减仓={float(params.get('pre_overheat_end_exposure', DEFAULT_REGIME_MIX_PRE_OVERHEAT_END_EXPOSURE)):.0%}"
-        f"(动量 {float(params.get('pre_overheat_start_cut', DEFAULT_REGIME_MIX_PRE_OVERHEAT_START_CUT)):.0%}->"
-        f"{float(params.get('pre_overheat_end_cut', DEFAULT_REGIME_MIX_PRE_OVERHEAT_END_CUT)):.0%}), "
-        f"过热降仓={float(params.get('overheat_max_exposure', DEFAULT_REGIME_MIX_OVERHEAT_MAX_EXPOSURE)):.1%}"
-        f"(回撤>={float(params.get('overheat_drawdown_cut', DEFAULT_REGIME_MIX_OVERHEAT_DRAWDOWN_CUT)):.0%}, "
-        f"动量>={float(params.get('overheat_momentum_cut', DEFAULT_REGIME_MIX_OVERHEAT_MOMENTUM_CUT)):.0%}), "
-        f"极热降仓={float(params.get('overheat_high_max_exposure', DEFAULT_REGIME_MIX_OVERHEAT_HIGH_MAX_EXPOSURE)):.1%}"
-        f"(动量>={float(params.get('overheat_high_momentum_cut', DEFAULT_REGIME_MIX_OVERHEAT_HIGH_MOMENTUM_CUT)):.0%}), "
+        f"历史动量分位控仓="
+        f"{float(params.get('signal_selected_momentum_pct_cap_floor', 1.0)):.0%}"
+        f"(>{float(params.get('signal_selected_momentum_pct_cap_start', 1.0)):.0%}->"
+        f"{float(params.get('signal_selected_momentum_pct_cap_end', 1.0)):.0%}, "
+        f"scope={str(params.get('signal_selected_momentum_pct_cap_scope', 'all'))}), "
+        f"最小调仓阈值={float(params.get('target_min_rebalance_threshold', 0.0)):.0%}, "
         f"弱市切债={STRESS_BOND_ETF['name']}({DEFAULT_STRESS_BOND_CODE}), 风险仓上限={DEFAULT_STRESS_BOND_RISK_CAP:.1%}"
         f"(20/60<{DEFAULT_STRESS_BOND_RATIO_CUT:.0%}, 广度<{DEFAULT_STRESS_BOND_BREADTH_CUT:.1%})"
     )
@@ -630,6 +696,19 @@ def build_weight_frame_from_holding_exposure(
     return weights
 
 
+def extract_target_weights_from_result(result: pd.DataFrame) -> pd.DataFrame:
+    """从结果表里还原目标权重表。"""
+    target_cols = [col for col in result.columns if col.startswith("target_weight_")]
+    if target_cols:
+        weights = result[target_cols].copy()
+        weights.columns = [col.removeprefix("target_weight_") for col in target_cols]
+        return weights.fillna(0.0)
+    weight_cols = [col for col in result.columns if col.startswith("weight_")]
+    weights = result[weight_cols].copy()
+    weights.columns = [col.removeprefix("weight_") for col in weight_cols]
+    return weights.fillna(0.0)
+
+
 def build_position_series_from_weight_frame(weights: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     """根据逐标的权重表还原组合主持仓与总仓位。"""
     normalized = weights.fillna(0.0)
@@ -782,6 +861,91 @@ def recompute_return_chain(
     refreshed["nav"] = nav
     refreshed["drawdown"] = drawdown
     return refreshed
+
+
+def apply_selected_signal_momentum_pct_cap_to_target_weights(
+    prices: pd.DataFrame,
+    target_weights: pd.DataFrame,
+    *,
+    cap_start: float,
+    cap_end: float,
+    cap_floor: float,
+    lookback: int = DEFAULT_LOOKBACK,
+    state_lookback: int = 756,
+    min_periods: int = 120,
+    scope: str = "all",
+    risk_codes: list[str] | None = None,
+) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+    """按当前目标主信号的自身历史动量分位对总仓位做上限裁切。"""
+    if cap_floor <= 0 or cap_floor > 1.0:
+        raise ValueError("cap_floor must be within (0, 1]")
+    if cap_end < cap_start:
+        raise ValueError("cap_end must be >= cap_start")
+
+    adjusted = target_weights.reindex(index=prices.index, columns=prices.columns, fill_value=0.0).fillna(0.0).copy()
+    signal = adjusted.idxmax(axis=1).where(adjusted.max(axis=1) > 1e-12, pd.NA)
+    selected_pct = pd.Series(index=prices.index, dtype="float64", name="selected_momentum_percentile")
+    triggered = pd.Series(False, index=prices.index, dtype=bool, name="selected_momentum_pct_cap_triggered")
+    signal_pct = build_asset_own_momentum_percentile(
+        prices,
+        lookback=lookback,
+        state_lookback=state_lookback,
+        min_periods=min_periods,
+    )
+    risk_set = set(risk_codes or [])
+    all_set = set(prices.columns)
+    if scope == "all":
+        eligible_codes = all_set
+    elif scope == "risk":
+        eligible_codes = risk_set
+    elif scope == "defensive":
+        eligible_codes = all_set - risk_set
+    else:
+        raise ValueError(f"unsupported momentum pct cap scope: {scope}")
+
+    for dt_idx in adjusted.index:
+        signal_code = normalize_code(signal.loc[dt_idx])
+        if signal_code is None or signal_code not in eligible_codes or signal_code not in signal_pct.columns:
+            continue
+        pct_value = signal_pct.loc[dt_idx, signal_code]
+        if pd.isna(pct_value):
+            continue
+        selected_pct.loc[dt_idx] = float(pct_value)
+        if float(pct_value) < cap_start:
+            continue
+        if cap_end > cap_start:
+            progress = min(max((float(pct_value) - cap_start) / (cap_end - cap_start), 0.0), 1.0)
+            cap_value = 1.0 + (cap_floor - 1.0) * progress
+        else:
+            cap_value = cap_floor
+        total_weight = float(adjusted.loc[dt_idx].sum())
+        if total_weight > cap_value + 1e-12:
+            adjusted.loc[dt_idx, :] = adjusted.loc[dt_idx, :] * (cap_value / total_weight)
+            triggered.loc[dt_idx] = True
+
+    return adjusted, selected_pct, triggered
+
+
+def apply_min_rebalance_threshold_to_target_weights(
+    target_weights: pd.DataFrame,
+    threshold: float,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """只有当目标权重变化足够大时，才确认新的目标组合。"""
+    adjusted = target_weights.copy()
+    blocked = pd.Series(False, index=adjusted.index, dtype=bool, name="rebalance_threshold_blocked")
+    if threshold <= 0 or adjusted.empty:
+        return adjusted, blocked
+
+    previous = adjusted.iloc[0].copy()
+    for dt_idx in adjusted.index[1:]:
+        desired = adjusted.loc[dt_idx]
+        turnover = float((desired - previous).abs().sum())
+        if turnover < threshold:
+            adjusted.loc[dt_idx] = previous
+            blocked.loc[dt_idx] = True
+        else:
+            previous = desired.copy()
+    return adjusted, blocked
 
 
 def compute_signal_asset_momentum(
@@ -1466,11 +1630,11 @@ def build_default_strategy_params(
         "overheat_drawdown_cut": DEFAULT_REGIME_MIX_OVERHEAT_DRAWDOWN_CUT,
         "pre_overheat_start_cut": DEFAULT_REGIME_MIX_PRE_OVERHEAT_START_CUT,
         "pre_overheat_end_cut": DEFAULT_REGIME_MIX_PRE_OVERHEAT_END_CUT,
-        "pre_overheat_end_exposure": DEFAULT_REGIME_MIX_PRE_OVERHEAT_END_EXPOSURE,
+        "pre_overheat_end_exposure": 1.0,
         "overheat_momentum_cut": DEFAULT_REGIME_MIX_OVERHEAT_MOMENTUM_CUT,
-        "overheat_max_exposure": DEFAULT_REGIME_MIX_OVERHEAT_MAX_EXPOSURE,
+        "overheat_max_exposure": 1.0,
         "overheat_high_momentum_cut": DEFAULT_REGIME_MIX_OVERHEAT_HIGH_MOMENTUM_CUT,
-        "overheat_high_max_exposure": DEFAULT_REGIME_MIX_OVERHEAT_HIGH_MAX_EXPOSURE,
+        "overheat_high_max_exposure": 1.0,
         "overheat_cap_mode": "step",
         "overheat_stability_method": "none",
         "overheat_stability_min_rank": 0.0,
@@ -1478,11 +1642,14 @@ def build_default_strategy_params(
         "signal_selected_volatility_cap_start": 1.0,
         "signal_selected_volatility_cap_end": 1.0,
         "signal_selected_volatility_cap_floor": 1.0,
-        "signal_selected_momentum_pct_cap_start": 1.0,
-        "signal_selected_momentum_pct_cap_end": 1.0,
-        "signal_selected_momentum_pct_cap_floor": 1.0,
+        "signal_selected_momentum_pct_cap_start": 0.90,
+        "signal_selected_momentum_pct_cap_end": 0.95,
+        "signal_selected_momentum_pct_cap_floor": 0.50,
+        "signal_selected_momentum_pct_cap_scope": "all",
+        "signal_selected_momentum_pct_cap_stage": "post_overlay",
         "signal_selected_momentum_pct_lookback": 756,
         "signal_selected_momentum_pct_min_periods": 120,
+        "target_min_rebalance_threshold": 0.05,
     }
 
 
@@ -1558,6 +1725,52 @@ def run_default_strategy_with_params(
         fill_residual_cash_to_treasury=fill_residual_cash_to_treasury,
         return_target_weights=True,
     )
+    internal_momentum = result["current_momentum"].copy().rename("current_momentum")
+    post_overlay_selected_momentum_percentile = None
+    post_overlay_selected_momentum_trigger = None
+    post_overlay_threshold_blocked = None
+
+    momentum_pct_stage = str(params.get("signal_selected_momentum_pct_cap_stage", "core"))
+    momentum_pct_cap_start = float(params.get("signal_selected_momentum_pct_cap_start", 1.0))
+    momentum_pct_cap_end = float(params.get("signal_selected_momentum_pct_cap_end", 1.0))
+    momentum_pct_cap_floor = float(params.get("signal_selected_momentum_pct_cap_floor", 1.0))
+    if momentum_pct_stage == "post_overlay" and (momentum_pct_cap_start < 1.0 or momentum_pct_cap_end < 1.0):
+        target_weights, post_overlay_selected_momentum_percentile, post_overlay_selected_momentum_trigger = (
+            apply_selected_signal_momentum_pct_cap_to_target_weights(
+                prices,
+                target_weights,
+                cap_start=momentum_pct_cap_start,
+                cap_end=momentum_pct_cap_end,
+                cap_floor=momentum_pct_cap_floor,
+                lookback=DEFAULT_LOOKBACK,
+                state_lookback=int(params.get("signal_selected_momentum_pct_lookback", 756)),
+                min_periods=int(params.get("signal_selected_momentum_pct_min_periods", 120)),
+                scope=str(params.get("signal_selected_momentum_pct_cap_scope", "all")),
+                risk_codes=[str(code) for code in params.get("risk_codes", RISK_CODES)],
+            )
+        )
+
+    rebalance_threshold = float(params.get("target_min_rebalance_threshold", 0.0))
+    if rebalance_threshold > 0:
+        target_weights, post_overlay_threshold_blocked = apply_min_rebalance_threshold_to_target_weights(
+            target_weights,
+            rebalance_threshold,
+        )
+
+    if (
+        post_overlay_selected_momentum_percentile is not None
+        or post_overlay_threshold_blocked is not None
+    ):
+        from compare_hs300_regime_fixes import run_target_weights_strategy
+
+        result, trades = run_target_weights_strategy(
+            prices,
+            selected,
+            target_weights,
+            internal_momentum,
+            fee_rate,
+            slippage_rate,
+        )
     return_weight_cols = [col for col in result.columns if col.startswith("weight_")]
     if return_weight_cols:
         return_weights = result[return_weight_cols].copy()
@@ -1607,6 +1820,10 @@ def run_default_strategy_with_params(
         result["selected_momentum_percentile"] = base_result["selected_momentum_percentile"].reindex(result.index)
     if "selected_momentum_pct_cap_triggered" in base_result.columns:
         result["selected_momentum_pct_cap_triggered"] = base_result["selected_momentum_pct_cap_triggered"].reindex(result.index).fillna(False)
+    if post_overlay_selected_momentum_percentile is not None:
+        result["selected_momentum_percentile"] = post_overlay_selected_momentum_percentile.reindex(result.index)
+    if post_overlay_selected_momentum_trigger is not None:
+        result["selected_momentum_pct_cap_triggered"] = post_overlay_selected_momentum_trigger.reindex(result.index).fillna(False)
     if "extra_cap_triggered" in base_result.columns:
         result["extra_cap_triggered"] = base_result["extra_cap_triggered"].reindex(result.index).fillna(False)
     if "extra_cap_reason" in base_result.columns:
@@ -1619,6 +1836,8 @@ def run_default_strategy_with_params(
         result["overheat_stability_cap_triggered"] = base_result["overheat_stability_cap_triggered"].reindex(result.index).fillna(False)
     result["target_exposure"] = target_weights.sum(axis=1).rename("target_exposure")
     result["stress_bond_trigger"] = stress_mask
+    if post_overlay_threshold_blocked is not None:
+        result["rebalance_threshold_blocked"] = post_overlay_threshold_blocked.reindex(result.index).fillna(False)
     # 保留目标组合权重，供 daily_monitor 直接展示“今日目标组合”，
     # 避免把多资产目标误压缩成“单一主信号 + 总仓位”。
     result = pd.concat([result, target_weights.add_prefix("target_weight_")], axis=1)
@@ -2388,6 +2607,16 @@ def save_outputs(
     write_dataframe_csv_atomic(prices_to_save, CORE_OUTPUT_DIR / "prices.csv")
     write_dataframe_csv_atomic(result_to_save, CORE_OUTPUT_DIR / "backtest_nav.csv")
     write_dataframe_csv_atomic(trades, CORE_OUTPUT_DIR / "trades.csv", index=False)
+    momentum_percentile_snapshot = build_current_etf_momentum_percentile_table(
+        selected,
+        prices,
+        lookback=lookback,
+    )
+    write_dataframe_csv_atomic(
+        momentum_percentile_snapshot,
+        CORE_OUTPUT_DIR / "etf_momentum_percentiles.csv",
+        index=False,
+    )
     # 与各分支回测输出保持一致，统一把净值列落成 historical_nav，
     # 避免外部按同一 schema 读取不同策略目录时因列名不一致出错。
     write_dataframe_csv_atomic(
