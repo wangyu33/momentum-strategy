@@ -155,7 +155,7 @@ def strategy_name(drop_codes: list[str], params: dict[str, object]) -> str:
     if abs(params["overheat_high_momentum_cut"] - 0.32) > 1e-12:
         suffix_parts.append(f"ohh{int(round(params['overheat_high_momentum_cut'] * 100)):02d}")
 
-    suffix = "__stressbond_default"
+    suffix = "__baseline_default"
     if not suffix_parts:
         return f"{base}{suffix}"
     return f"{base}_{'_'.join(suffix_parts)}{suffix}"
@@ -174,7 +174,9 @@ def strategy_description(drop_codes: list[str], params: dict[str, object]) -> st
         f"{'（软区间=' + format(params['volume_guard_soft_span'], '.0%') + '）' if params['volume_guard_relief_buffer'] > 0 else ''}；"
         f"过热保护为回撤阈值 {params['overheat_drawdown_cut']:.0%}、动量>{params['overheat_momentum_cut']:.0%} 时压到 "
         f"{params['overheat_max_exposure']:.0%}，极热动量>{params['overheat_high_momentum_cut']:.0%} 时压到 "
-        f"{params['overheat_high_max_exposure']:.0%}；弱市切债规则保持默认十年国债防守不变。"
+        f"{params['overheat_high_max_exposure']:.0%}；正式默认基线不启用弱市切债，"
+        f"但当防守信号历史动量分位达到 {params.get('defensive_signal_selected_momentum_pct_cap_start', 1.0):.0%} 时，"
+        f"总仓位进一步压到 {params.get('defensive_signal_selected_momentum_pct_cap_floor', 1.0):.0%}。"
     )
 
 

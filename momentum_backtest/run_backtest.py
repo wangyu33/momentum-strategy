@@ -102,7 +102,7 @@ DEFAULT_SIGNAL_LEADER_MARGIN = 0.0
 DEFAULT_CLOSE_TOP2_GAP = 0.005
 DEFAULT_CLOSE_TOP2_RISK_CAP = 0.70
 DEFAULT_STRESS_BOND_CODE = "511260"
-DEFAULT_STRESS_BOND_RISK_CAP = 0.0
+DEFAULT_STRESS_BOND_RISK_CAP = 1.0
 DEFAULT_STRESS_BOND_RATIO_CUT = 0.90
 DEFAULT_STRESS_BOND_BREADTH_CUT = -0.031
 DEFAULT_STRESS_BOND_ENTER_DAYS = 1
@@ -462,9 +462,16 @@ def default_strategy_param_text(pool_size: int) -> str:
         f"(>{float(params.get('signal_selected_momentum_pct_cap_start', 1.0)):.0%}->"
         f"{float(params.get('signal_selected_momentum_pct_cap_end', 1.0)):.0%}, "
         f"scope={str(params.get('signal_selected_momentum_pct_cap_scope', 'all'))}), "
+        f"防守过热控仓="
+        f"{float(params.get('defensive_signal_selected_momentum_pct_cap_floor', 1.0)):.0%}"
+        f"(防守信号分位>={float(params.get('defensive_signal_selected_momentum_pct_cap_start', 1.0)):.0%}), "
         f"最小调仓阈值={float(params.get('target_min_rebalance_threshold', 0.0)):.0%}, "
-        f"弱市切债={STRESS_BOND_ETF['name']}({DEFAULT_STRESS_BOND_CODE}), 风险仓上限={DEFAULT_STRESS_BOND_RISK_CAP:.1%}"
-        f"(20/60<{DEFAULT_STRESS_BOND_RATIO_CUT:.0%}, 广度<{DEFAULT_STRESS_BOND_BREADTH_CUT:.1%})"
+        + (
+            f"弱市切债={STRESS_BOND_ETF['name']}({DEFAULT_STRESS_BOND_CODE}), 风险仓上限={DEFAULT_STRESS_BOND_RISK_CAP:.1%}"
+            f"(20/60<{DEFAULT_STRESS_BOND_RATIO_CUT:.0%}, 广度<{DEFAULT_STRESS_BOND_BREADTH_CUT:.1%})"
+            if DEFAULT_STRESS_BOND_RISK_CAP < 1.0
+            else f"弱市切债=关闭(默认不启用 {STRESS_BOND_ETF['name']} 覆盖层)"
+        )
     )
 
 
@@ -924,6 +931,42 @@ def apply_selected_signal_momentum_pct_cap_to_target_weights(
             triggered.loc[dt_idx] = True
 
     return adjusted, selected_pct, triggered
+
+
+def apply_defensive_signal_momentum_pct_cap_to_target_weights(
+    target_weights: pd.DataFrame,
+    *,
+    selected_percentile: pd.Series,
+    cap_start: float,
+    cap_floor: float,
+    defensive_codes: list[str] | None = None,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """当防守信号自身历史分位过热时，进一步压低总仓位。"""
+    if cap_floor <= 0 or cap_floor > 1.0:
+        raise ValueError("cap_floor must be within (0, 1]")
+    if cap_start < 0 or cap_start > 1.0:
+        raise ValueError("cap_start must be within [0, 1]")
+
+    adjusted = target_weights.copy()
+    triggered = pd.Series(False, index=adjusted.index, dtype=bool, name="defensive_signal_momentum_pct_cap_triggered")
+    defensive_set = set(defensive_codes or [])
+    if not defensive_set or adjusted.empty:
+        return adjusted, triggered
+
+    signal = adjusted.idxmax(axis=1).where(adjusted.max(axis=1) > 1e-12, pd.NA)
+    aligned_pct = selected_percentile.reindex(adjusted.index)
+    for dt_idx in adjusted.index:
+        signal_code = normalize_code(signal.loc[dt_idx])
+        if signal_code is None or signal_code not in defensive_set:
+            continue
+        pct_value = aligned_pct.loc[dt_idx]
+        if pd.isna(pct_value) or float(pct_value) < cap_start:
+            continue
+        total_weight = float(adjusted.loc[dt_idx].sum())
+        if total_weight > cap_floor + 1e-12:
+            adjusted.loc[dt_idx, :] = adjusted.loc[dt_idx, :] * (cap_floor / total_weight)
+            triggered.loc[dt_idx] = True
+    return adjusted, triggered
 
 
 def apply_min_rebalance_threshold_to_target_weights(
@@ -1649,6 +1692,8 @@ def build_default_strategy_params(
         "signal_selected_momentum_pct_cap_stage": "post_overlay",
         "signal_selected_momentum_pct_lookback": 756,
         "signal_selected_momentum_pct_min_periods": 120,
+        "defensive_signal_selected_momentum_pct_cap_start": 0.95,
+        "defensive_signal_selected_momentum_pct_cap_floor": 0.30,
         "target_min_rebalance_threshold": 0.05,
     }
 
@@ -1709,6 +1754,7 @@ def run_default_strategy_with_params(
         enter_days=enter_days,
         exit_days=exit_days,
     )
+    stress_overlay_active = stress_mask & (row_risk_weight > risk_cap + 1e-12)
     result, trades, target_weights = apply_persistent_overlay(
         prices,
         selected,
@@ -1728,6 +1774,7 @@ def run_default_strategy_with_params(
     internal_momentum = result["current_momentum"].copy().rename("current_momentum")
     post_overlay_selected_momentum_percentile = None
     post_overlay_selected_momentum_trigger = None
+    post_overlay_defensive_momentum_trigger = None
     post_overlay_threshold_blocked = None
 
     momentum_pct_stage = str(params.get("signal_selected_momentum_pct_cap_stage", "core"))
@@ -1748,6 +1795,25 @@ def run_default_strategy_with_params(
                 scope=str(params.get("signal_selected_momentum_pct_cap_scope", "all")),
                 risk_codes=[str(code) for code in params.get("risk_codes", RISK_CODES)],
             )
+        )
+    defensive_momentum_pct_cap_start = float(params.get("defensive_signal_selected_momentum_pct_cap_start", 1.0))
+    defensive_momentum_pct_cap_floor = float(params.get("defensive_signal_selected_momentum_pct_cap_floor", 1.0))
+    selected_pct_for_defensive_cap = (
+        post_overlay_selected_momentum_percentile
+        if post_overlay_selected_momentum_percentile is not None
+        else base_result.get("selected_momentum_percentile")
+    )
+    if (
+        selected_pct_for_defensive_cap is not None
+        and defensive_momentum_pct_cap_start < 1.0
+        and defensive_momentum_pct_cap_floor < 1.0
+    ):
+        target_weights, post_overlay_defensive_momentum_trigger = apply_defensive_signal_momentum_pct_cap_to_target_weights(
+            target_weights,
+            selected_percentile=selected_pct_for_defensive_cap,
+            cap_start=defensive_momentum_pct_cap_start,
+            cap_floor=defensive_momentum_pct_cap_floor,
+            defensive_codes=[str(code) for code in params.get("defensive_codes", DEFENSIVE_CODES)],
         )
 
     rebalance_threshold = float(params.get("target_min_rebalance_threshold", 0.0))
@@ -1824,6 +1890,12 @@ def run_default_strategy_with_params(
         result["selected_momentum_percentile"] = post_overlay_selected_momentum_percentile.reindex(result.index)
     if post_overlay_selected_momentum_trigger is not None:
         result["selected_momentum_pct_cap_triggered"] = post_overlay_selected_momentum_trigger.reindex(result.index).fillna(False)
+    if post_overlay_defensive_momentum_trigger is not None:
+        combined_selected_pct_trigger = result["selected_momentum_pct_cap_triggered"].reindex(result.index).fillna(False)
+        result["selected_momentum_pct_cap_triggered"] = (
+            combined_selected_pct_trigger | post_overlay_defensive_momentum_trigger.reindex(result.index).fillna(False)
+        )
+        result["defensive_signal_momentum_pct_cap_triggered"] = post_overlay_defensive_momentum_trigger.reindex(result.index).fillna(False)
     if "extra_cap_triggered" in base_result.columns:
         result["extra_cap_triggered"] = base_result["extra_cap_triggered"].reindex(result.index).fillna(False)
     if "extra_cap_reason" in base_result.columns:
