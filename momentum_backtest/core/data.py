@@ -9,10 +9,11 @@ import pandas as pd
 
 from .config import CORE_OUTPUT_DIR, DEFAULT_HISTORY_START
 from .io import is_trading_day
-from .validation import persist_price_validation_report
+from .validation import detect_price_discontinuities, persist_price_validation_report
 
 
 OPTIONAL_REALTIME_FALLBACK_PREFIXES = ("511",)
+MAX_SPLIT_REPAIR_PASSES = 4
 
 
 def apply_sina_cash_dividend_total_return(hist: pd.DataFrame, symbol: str) -> pd.DataFrame:
@@ -173,6 +174,47 @@ def append_temporary_today_bar(
     return prices
 
 
+def repair_split_like_discontinuities(
+    prices: pd.DataFrame,
+    *,
+    max_passes: int = MAX_SPLIT_REPAIR_PASSES,
+) -> pd.DataFrame:
+    repaired = prices.copy().sort_index()
+    repaired.index.name = "date"
+
+    for _ in range(max_passes):
+        issues = detect_price_discontinuities(repaired)
+        split_like = issues.loc[issues["issue_type"] == "split_like_gap"].copy()
+        if split_like.empty:
+            break
+
+        applied = False
+        for row in split_like.sort_values(["date", "code"]).itertuples(index=False):
+            code = str(row.code)
+            break_date = pd.Timestamp(row.date)
+            factor = row.split_like_factor
+            if (
+                code not in repaired.columns
+                or factor is None
+                or pd.isna(factor)
+                or float(factor) <= 0.0
+                or break_date not in repaired.index
+            ):
+                continue
+
+            prior_mask = repaired.index < break_date
+            if not prior_mask.any():
+                continue
+
+            repaired.loc[prior_mask, code] = repaired.loc[prior_mask, code] / float(factor)
+            applied = True
+
+        if not applied:
+            break
+
+    return repaired
+
+
 def fetch_histories(selected: pd.DataFrame, years: int) -> pd.DataFrame:
     end_date = pd.Timestamp.today().normalize()
     today = end_date.date()
@@ -211,6 +253,7 @@ def fetch_histories(selected: pd.DataFrame, years: int) -> pd.DataFrame:
         raw_last_close=raw_last_close,
         today=today,
     )
+    prices = repair_split_like_discontinuities(prices)
     persist_price_validation_report(prices)
     return prices
 
@@ -227,5 +270,6 @@ def load_core_selected_and_prices(
         today=today,
         allow_same_day_close=allow_same_day_close,
     )
+    prices = repair_split_like_discontinuities(prices)
     persist_price_validation_report(prices)
     return selected, prices

@@ -50,7 +50,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fee-rate", type=float, default=DEFAULT_FEE_RATE, help="单边手续费率。")
     parser.add_argument("--slippage-rate", type=float, default=DEFAULT_SLIPPAGE_RATE, help="单边滑点率。")
     parser.add_argument("--cash-threshold", type=float, default=DEFAULT_CASH_THRESHOLD, help="兼容旧参数；正式基线不使用。")
-    parser.add_argument("--disable-overheat-cap", action="store_true", help="兼容旧参数；当前正式基线已是 plain threshold dual momentum。")
+    parser.add_argument("--disable-overheat-cap", action="store_true", help="兼容旧参数；关闭正式基线里的 Boll 过热压仓，只保留 raw 25 日 dual momentum。")
     return parser.parse_args()
 
 

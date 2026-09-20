@@ -24,7 +24,6 @@ try:
         should_include_realtime_snapshot,
     )
     from .core.config import DEFAULT_LOOKBACK
-    from .core.strategy import build_default_strategy_params
     from .core.signals import build_quality_momentum_single_asset_signal
     from .core.io import normalize_code
 except ImportError:
@@ -43,7 +42,6 @@ except ImportError:
         should_include_realtime_snapshot,
     )
     from core.config import DEFAULT_LOOKBACK
-    from core.strategy import build_default_strategy_params
     from core.signals import build_quality_momentum_single_asset_signal
     from core.io import normalize_code
 
@@ -68,20 +66,19 @@ def build_leader_context(
             'defensive_leader_momentum': None,
         }
 
-    params = build_default_strategy_params()
     signal, _, current_momentum, _ = build_quality_momentum_single_asset_signal(
         prices,
         lookback=DEFAULT_LOOKBACK,
-        signal_quality_method=str(params.get('signal_quality_method', 'raw')),
-        slope_penalty=float(params.get('signal_slope_penalty', 0.0)),
-        volatility_penalty=float(params.get('signal_volatility_penalty', 0.0)),
-        downside_volatility_penalty=float(params.get('signal_downside_volatility_penalty', 0.0)),
-        r2_penalty=float(params.get('signal_r2_penalty', 0.0)),
-        volatility_state_lookback=int(params.get('signal_volatility_state_lookback', 252)),
-        volatility_percentile_penalty=float(params.get('signal_volatility_percentile_penalty', 0.0)),
-        downside_volatility_percentile_penalty=float(params.get('signal_downside_volatility_percentile_penalty', 0.0)),
-        volatility_percentile_divisor=float(params.get('signal_volatility_percentile_divisor', 0.0)),
-        leader_margin=float(params.get('signal_leader_margin', 0.0)),
+        signal_quality_method="raw",
+        slope_penalty=0.0,
+        volatility_penalty=0.0,
+        downside_volatility_penalty=0.0,
+        r2_penalty=0.0,
+        volatility_state_lookback=252,
+        volatility_percentile_penalty=0.0,
+        downside_volatility_percentile_penalty=0.0,
+        volatility_percentile_divisor=0.0,
+        leader_margin=0.0,
         candidate_codes=[str(code) for code in prices.columns],
     )
     risk_code = normalize_code(signal.loc[latest_idx]) if latest_idx in signal.index else None
