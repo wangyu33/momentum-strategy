@@ -24,20 +24,14 @@ import akshare as ak
 import pandas as pd
 
 try:
-    from .candidate_pool_common import ETF_513050
-    from .compare_resource_guards import RESOURCE_ETF
-    from .run_backtest import (
+    from .core.config import (
         CORE_OUTPUT_DIR,
         DEFAULT_STRATEGY_NAME,
         MONITOR_OUTPUT_DIR,
-        RESEARCH_OUTPUT_DIR,
-        ensure_output_dirs,
-        fetch_realtime_etf_prices,
-        filter_history_to_confirmed_closes,
-        is_trading_day,
         load_default_strategy_backtest_pool,
-        should_accept_same_day_history,
     )
+    from .core.data import fetch_realtime_etf_prices, filter_history_to_confirmed_closes, should_accept_same_day_history
+    from .core.io import ensure_output_dirs, is_trading_day
     from .monitor_snapshot import (
         classify_market_session,
         should_include_realtime_snapshot,
@@ -66,20 +60,14 @@ try:
         format_trade_message,
     )
 except ImportError:
-    from candidate_pool_common import ETF_513050
-    from compare_resource_guards import RESOURCE_ETF
-    from run_backtest import (
+    from core.config import (
         CORE_OUTPUT_DIR,
         DEFAULT_STRATEGY_NAME,
         MONITOR_OUTPUT_DIR,
-        RESEARCH_OUTPUT_DIR,
-        ensure_output_dirs,
-        fetch_realtime_etf_prices,
-        filter_history_to_confirmed_closes,
-        is_trading_day,
         load_default_strategy_backtest_pool,
-        should_accept_same_day_history,
     )
+    from core.data import fetch_realtime_etf_prices, filter_history_to_confirmed_closes, should_accept_same_day_history
+    from core.io import ensure_output_dirs, is_trading_day
     from monitor_snapshot import (
         classify_market_session,
         should_include_realtime_snapshot,
@@ -114,8 +102,6 @@ MONITOR_HISTORY_START = pd.Timestamp("2012-01-01")
 FEISHU_OPEN_ID = "ou_a6a198ce5e9f97430f257a04b502f49b"
 DEFAULT_FEISHU_WEBHOOK = "https://open.larkoffice.com/open-apis/bot/v2/hook/688de167-8de9-4822-aa1c-4dd723a4ace6"
 DEBUG_ENABLED = False
-CHINA_INTERNET_CAP70_OUTPUT_DIR = RESEARCH_OUTPUT_DIR / "china_internet_cap70"
-RESOURCE_ABS08_OUTPUT_DIR = RESEARCH_OUTPUT_DIR / "resource_abs08"
 WEBHOOK_RETRY_SLEEP_SECONDS = 1.5
 WEBHOOK_MAX_RETRIES = 3
 REGIME_MIN_SAMPLE_COUNT = 20
@@ -260,7 +246,6 @@ class SignalSnapshot:
     top2_close_cap_triggered: bool
     top2_close_gap: float | None
     top2_close_risk_cap: float | None
-    rebalance_threshold_blocked: bool
     base_exposure: float | None
     confirmed_trade_date: str | None
     confirmed_trade_details: str
@@ -318,33 +303,18 @@ def _load_selected_pool_from_output(output_dir: Path, fallback_loader) -> list[d
 
 
 def build_strategy_config(strategy_id: str) -> dict[str, object]:
-    if strategy_id == "default":
-        output_dir = CORE_OUTPUT_DIR
-        strategy_label = DEFAULT_STRATEGY_NAME
-        selected_pool = _load_selected_pool_from_output(output_dir, load_default_strategy_backtest_pool)
-    elif strategy_id == "china_internet_cap70":
-        output_dir = CHINA_INTERNET_CAP70_OUTPUT_DIR
-        strategy_label = "china_internet_cap70"
-        selected_pool = _load_selected_pool_from_output(
-            output_dir,
-            lambda: pd.concat([load_fixed_etf_pool(), pd.DataFrame([ETF_513050])], ignore_index=True),
-        )
-    elif strategy_id == "resource_abs08":
-        output_dir = RESOURCE_ABS08_OUTPUT_DIR
-        strategy_label = "resource_abs08"
-        selected_pool = _load_selected_pool_from_output(
-            output_dir,
-            lambda: pd.concat([load_fixed_etf_pool(), pd.DataFrame([RESOURCE_ETF])], ignore_index=True),
-        )
-    else:
+    if strategy_id != "default":
         raise ValueError(f"unsupported strategy id: {strategy_id}")
+    output_dir = CORE_OUTPUT_DIR
+    strategy_label = DEFAULT_STRATEGY_NAME
+    selected_pool = _load_selected_pool_from_output(output_dir, load_default_strategy_backtest_pool)
 
     return {
         "strategy_id": strategy_id,
         "strategy_label": strategy_label,
         "selected_pool": selected_pool,
         "backtest_nav_file": str(output_dir / "backtest_nav.csv"),
-        "state_file": str((MONITOR_OUTPUT_DIR if strategy_id == "default" else output_dir) / "daily_monitor_state.json"),
+        "state_file": str(MONITOR_OUTPUT_DIR / "daily_monitor_state.json"),
         "extra_cap_label": "命中额外降仓",
     }
 
@@ -353,17 +323,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ETF 动量策略每日巡检。")
     parser.add_argument(
         "--strategy",
-        choices=["default", "china_internet_cap70", "resource_abs08"],
+        choices=["default"],
         default="default",
         help="选择要巡检的策略快照。",
     )
-    parser.add_argument("--force", action="store_true", help="忽略状态缓存并写入新状态；适合正式补发，但会影响后续同时段定时去重。")
-    parser.add_argument("--preview-send", action="store_true", help="发送当前快照但不读写去重状态；人工补发默认应使用这个参数，不影响后续正式定时通知。")
+    parser.add_argument("--force", action="store_true", help="忽略状态缓存并写入新状态；适合正式补发，且允许非交易日手动补发。")
+    parser.add_argument("--preview-send", action="store_true", help="发送当前快照但不读写去重状态；人工补发默认应使用这个参数，且允许非交易日手动补发。")
     parser.add_argument("--debug", action="store_true", help="输出调试日志到 stderr。")
     parser.add_argument("--webhook-url", type=str, default="", help="临时指定飞书机器人 webhook。")
-    parser.set_defaults(disable_direct_feishu=True)
-    parser.add_argument("--disable-direct-feishu", dest="disable_direct_feishu", action="store_true", help="关闭直连飞书私信，仅保留 webhook（默认）。")
-    parser.add_argument("--enable-direct-feishu", dest="disable_direct_feishu", action="store_false", help="开启直连飞书私信，与 webhook 并行发送。")
+    parser.set_defaults(disable_direct_feishu=False)
+    parser.add_argument("--disable-direct-feishu", dest="disable_direct_feishu", action="store_true", help="关闭直连飞书私信，仅保留 webhook。")
+    parser.add_argument("--enable-direct-feishu", dest="disable_direct_feishu", action="store_false", help="开启直连飞书私信，与 webhook 并行发送（默认）。")
     return parser.parse_args()
 
 
@@ -384,9 +354,13 @@ def main() -> int:
     today = now.date()
     market_session_label = classify_market_session(now)
 
+    manual_override_non_trading_day = args.force or args.preview_send
     if not is_trading_day(today):
-        log(f"skip non-trading day: {today}")
-        return 0
+        if manual_override_non_trading_day:
+            log(f"non-trading day override enabled: {today}")
+        else:
+            log(f"skip non-trading day: {today}")
+            return 0
 
     allow_same_day_close = market_session_label == "收盘后"
     close_prices = build_price_panel(

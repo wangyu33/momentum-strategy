@@ -1,9 +1,0 @@
-Threshold dual momentum:
-- risk winner momentum > 5%: hold risk winner at 100%
-- 0% < risk winner momentum <= 5%: hold defensive winner at 50%
-- risk winner momentum <= 0%: hold defensive winner at 100% if its momentum > 0, else cash
-
-Breadth dual momentum:
-- if >=3 risk assets have non-positive momentum: hold defensive winner at 100%
-- if 2 risk assets have non-positive momentum: hold defensive winner at 50%
-- otherwise: hold risk winner at 100%

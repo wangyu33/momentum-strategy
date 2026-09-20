@@ -3,12 +3,9 @@
 
 from __future__ import annotations
 
-import json
 import math
 from datetime import datetime
 from pathlib import Path
-from urllib import error as urllib_error
-from urllib import request as urllib_request
 
 import pandas as pd
 
@@ -19,11 +16,6 @@ except ImportError:
 
 REGIME_MIN_SAMPLE_COUNT = 20
 MONITOR_HISTORY_START = pd.Timestamp("2012-01-01")
-TRADING_MINUTES_PER_DAY = 240.0
-INDEX_REALTIME_SECID = {
-    "sh": "1.000001",
-    "sz": "0.399106",
-}
 
 
 def build_forward_regime_stats(nav_df: pd.DataFrame, horizon: int = 60) -> pd.DataFrame:
@@ -342,107 +334,14 @@ def should_include_realtime_snapshot(session_label: str) -> bool:
     return session_label in {"盘中", "午间休市"}
 
 
-def _normalize_index_price(value: object) -> float:
-    price = float(value)
-    if abs(price) >= 10000:
-        price /= 100.0
-    return price
-
-
-def _normalize_index_amount(value: object) -> float:
-    amount = float(value)
-    if abs(amount) >= 1e11:
-        amount /= 1000.0
-    return amount
-
-
-def _fetch_realtime_index_snapshot() -> dict[str, dict[str, float]]:
-    snapshot: dict[str, dict[str, float]] = {}
-    errors: list[str] = []
-    for prefix, secid in INDEX_REALTIME_SECID.items():
-        url = (
-            "https://push2.eastmoney.com/api/qt/stock/get"
-            f"?secid={secid}&fields=f43,f48"
-        )
-        try:
-            with urllib_request.urlopen(url, timeout=8) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-            data = payload.get("data") or {}
-            price = data.get("f43")
-            amount = data.get("f48")
-            if price in (None, "-", "") or amount in (None, "-", ""):
-                raise RuntimeError(f"missing quote fields for {prefix}")
-            snapshot[prefix] = {
-                "close": _normalize_index_price(price),
-                "amount": _normalize_index_amount(amount),
-            }
-        except (RuntimeError, ValueError, TypeError, json.JSONDecodeError, urllib_error.URLError) as exc:
-            errors.append(f"{prefix}: {exc}")
-    if len(snapshot) != len(INDEX_REALTIME_SECID):
-        raise RuntimeError("failed to load realtime index snapshot: " + " | ".join(errors))
-    return snapshot
-
-
-def _estimate_market_volume_progress(now: datetime) -> float | None:
-    minutes = now.hour * 60 + now.minute + now.second / 60.0
-    morning_start = 9 * 60 + 30
-    morning_end = 11 * 60 + 30
-    afternoon_start = 13 * 60
-    afternoon_end = 15 * 60
-    elapsed = 0.0
-    elapsed += max(min(minutes, morning_end) - morning_start, 0.0)
-    elapsed += max(min(minutes, afternoon_end) - afternoon_start, 0.0)
-    if elapsed <= 0:
-        return None
-    return float(min(elapsed / TRADING_MINUTES_PER_DAY, 1.0))
-
-
-def _append_intraday_market_proxy_row(
-    proxy: pd.DataFrame,
-    *,
-    prices: pd.DataFrame,
-    now: datetime,
-) -> tuple[pd.DataFrame, float | None]:
-    if proxy.empty:
-        raise RuntimeError("empty market proxy cache")
-    today_ts = pd.Timestamp(now.date()).normalize()
-    realtime_snapshot = _fetch_realtime_index_snapshot()
-    updated = proxy.copy().sort_index()
-    updated.loc[today_ts, "sh_close"] = realtime_snapshot["sh"]["close"]
-    updated.loc[today_ts, "sh_amount"] = realtime_snapshot["sh"]["amount"]
-    updated.loc[today_ts, "sz_close"] = realtime_snapshot["sz"]["close"]
-    updated.loc[today_ts, "sz_amount"] = realtime_snapshot["sz"]["amount"]
-    updated["market_amount"] = updated["sh_amount"] + updated["sz_amount"]
-    updated["market_amount_ma20"] = updated["market_amount"].rolling(20).mean()
-    updated["market_amount_ma60"] = updated["market_amount"].rolling(60).mean()
-    updated["market_amount_ratio_20_60"] = updated["market_amount_ma20"] / updated["market_amount_ma60"]
-    updated["market_amount_ratio_5_20"] = updated["market_amount"].rolling(5).mean() / updated["market_amount_ma20"]
-    updated["market_breadth_proxy"] = (
-        (updated["sh_close"] / updated["sh_close"].shift(20) - 1)
-        + (updated["sz_close"] / updated["sz_close"].shift(20) - 1)
-    ) / 2
-    updated = updated.reindex(updated.index.union(prices.index)).sort_index().ffill()
-    return updated, _estimate_market_volume_progress(now)
-
-
-def build_market_volume_proxy_for_monitor(
-    prices: pd.DataFrame,
-    *,
-    execution_mode: bool = False,
-    now: datetime | None = None,
-    log_fn=None,
-    proxy_kind: str = "hybrid_breadth_blend",
-    risk_codes: list[str] | None = None,
-) -> tuple[pd.DataFrame, dict[str, float | str | None]]:
+def build_market_volume_proxy_for_monitor(prices: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float | str | None]]:
     try:
-        from .goal_optimization_common import load_market_volume_proxy
-        from .market_proxy_common import build_proxy_catalog
+        from .core.proxy import load_market_volume_proxy
     except ImportError:
-        from goal_optimization_common import load_market_volume_proxy
-        from market_proxy_common import build_proxy_catalog
+        from core.proxy import load_market_volume_proxy
 
     years = max(int(math.ceil((prices.index.max() - prices.index.min()).days / 365.25)) + 1, 15)
-    base_proxy = load_market_volume_proxy(years=years, refresh=False).copy()
+    proxy = load_market_volume_proxy(years=years, refresh=False).copy()
     context: dict[str, float | str | None] = {
         "mode": "上一交易日收盘量能",
         "progress": None,
@@ -450,35 +349,11 @@ def build_market_volume_proxy_for_monitor(
         "market_amount_ratio_5_20": None,
         "market_breadth_proxy": None,
     }
-    if base_proxy.empty:
-        return base_proxy, context
+    if proxy.empty:
+        return proxy, context
 
-    effective_base_proxy = base_proxy
-    if execution_mode and now is not None:
-        try:
-            effective_base_proxy, progress = _append_intraday_market_proxy_row(
-                effective_base_proxy,
-                prices=prices,
-                now=now,
-            )
-            context["mode"] = "盘中执行估算量能"
-            context["progress"] = progress
-        except Exception as exc:
-            if log_fn is not None:
-                log_fn(f"failed to build intraday market proxy, fallback to confirmed close proxy: {exc}")
-            context["mode"] = "上一交易日收盘量能(执行口径回退)"
-
-    proxy_catalog = {
-        item["name"]: item["proxy"]
-        for item in build_proxy_catalog(
-            effective_base_proxy,
-            prices,
-            risk_codes=risk_codes,
-        )
-    }
-    effective_proxy = proxy_catalog.get(proxy_kind, effective_base_proxy.reindex(prices.index).ffill())
-    latest_proxy = effective_proxy.reindex(prices.index).ffill().iloc[-1]
+    latest_proxy = proxy.reindex(prices.index).ffill().iloc[-1]
     for key in ("market_amount_ratio_20_60", "market_amount_ratio_5_20", "market_breadth_proxy"):
         value = latest_proxy.get(key)
         context[key] = float(value) if pd.notna(value) else None
-    return effective_proxy, context
+    return proxy, context

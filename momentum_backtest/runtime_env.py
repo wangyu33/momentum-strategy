@@ -67,6 +67,7 @@ def configure_matplotlib_env() -> None:
     mplconfigdir = Path(__file__).resolve().parents[1] / ".mplconfig"
     mplconfigdir.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("MPLCONFIGDIR", str(mplconfigdir))
+    os.environ.setdefault("MPLBACKEND", "Agg")
 
 
 def write_json_atomic(path: Path, payload: object) -> None:

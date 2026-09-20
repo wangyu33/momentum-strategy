@@ -10,24 +10,18 @@ import pandas as pd
 
 try:
     from .monitor_snapshot import build_market_volume_proxy_for_monitor
-    from .run_backtest import (
-        DEFAULT_FEE_RATE,
-        DEFAULT_LOOKBACK,
-        DEFAULT_SLIPPAGE_RATE,
-        fetch_histories,
-        save_outputs,
-        write_dataframe_csv_atomic,
-    )
+    from .core.config import DEFAULT_FEE_RATE, DEFAULT_LOOKBACK, DEFAULT_SLIPPAGE_RATE
+    from .core.data import fetch_histories
+    from .core.strategy import run_default_strategy
+    from .core.reporting import save_outputs
+    from .core.io import write_dataframe_csv_atomic
 except ImportError:
     from monitor_snapshot import build_market_volume_proxy_for_monitor
-    from run_backtest import (
-        DEFAULT_FEE_RATE,
-        DEFAULT_LOOKBACK,
-        DEFAULT_SLIPPAGE_RATE,
-        fetch_histories,
-        save_outputs,
-        write_dataframe_csv_atomic,
-    )
+    from core.config import DEFAULT_FEE_RATE, DEFAULT_LOOKBACK, DEFAULT_SLIPPAGE_RATE
+    from core.data import fetch_histories
+    from core.strategy import run_default_strategy
+    from core.reporting import save_outputs
+    from core.io import write_dataframe_csv_atomic
 
 MONITOR_HISTORY_START = pd.Timestamp("2012-01-01")
 
@@ -134,15 +128,6 @@ def run_strategy_snapshot(
     prices: pd.DataFrame,
     strategy_config: dict[str, object],
 ):
-    try:
-        from .compare_china_internet_guards import run_variant as run_china_internet_variant
-        from .compare_resource_guards import run_variant as run_resource_variant
-        from .run_backtest import run_default_strategy
-    except ImportError:
-        from compare_china_internet_guards import run_variant as run_china_internet_variant
-        from compare_resource_guards import run_variant as run_resource_variant
-        from run_backtest import run_default_strategy
-
     selected_pool = strategy_config["selected_pool"]
     selected = pd.DataFrame(selected_pool)
     market_proxy_context: dict[str, float | str | None] = {
@@ -152,55 +137,20 @@ def run_strategy_snapshot(
         "market_amount_ratio_5_20": None,
         "market_breadth_proxy": None,
     }
-    if strategy_config["strategy_id"] == "default":
-        market_proxy, market_proxy_context = build_market_volume_proxy_for_monitor(prices)
-        result, trades = run_default_strategy(
-            prices,
-            selected,
-            fee_rate=DEFAULT_FEE_RATE,
-            slippage_rate=DEFAULT_SLIPPAGE_RATE,
-            market_proxy=market_proxy,
-        )
-        if "target_exposure" not in result.columns and "exposure" in result.columns:
-            result["target_exposure"] = result["exposure"].copy()
-        if "base_target_exposure" in result.columns:
-            base_target_exposure = result["base_target_exposure"].copy()
-        else:
-            base_target_exposure = result["target_exposure"].copy()
+    market_proxy, market_proxy_context = build_market_volume_proxy_for_monitor(prices)
+    result, trades = run_default_strategy(
+        prices,
+        selected,
+        fee_rate=DEFAULT_FEE_RATE,
+        slippage_rate=DEFAULT_SLIPPAGE_RATE,
+        market_proxy=market_proxy,
+    )
+    if "target_exposure" not in result.columns and "exposure" in result.columns:
+        result["target_exposure"] = result["exposure"].copy()
+    if "base_target_exposure" in result.columns:
+        base_target_exposure = result["base_target_exposure"].copy()
     else:
-        if strategy_config["strategy_id"] == "china_internet_cap70":
-            result, trades = run_china_internet_variant(
-                prices,
-                selected,
-                lookback=DEFAULT_LOOKBACK,
-                fee_rate=DEFAULT_FEE_RATE,
-                slippage_rate=DEFAULT_SLIPPAGE_RATE,
-                china_max_exposure=0.70,
-            )
-            base_result, _ = run_china_internet_variant(
-                prices,
-                selected,
-                lookback=DEFAULT_LOOKBACK,
-                fee_rate=DEFAULT_FEE_RATE,
-                slippage_rate=DEFAULT_SLIPPAGE_RATE,
-            )
-        else:
-            result, trades = run_resource_variant(
-                prices,
-                selected,
-                lookback=DEFAULT_LOOKBACK,
-                fee_rate=DEFAULT_FEE_RATE,
-                slippage_rate=DEFAULT_SLIPPAGE_RATE,
-                resource_abs_threshold=0.08,
-            )
-            base_result, _ = run_resource_variant(
-                prices,
-                selected,
-                lookback=DEFAULT_LOOKBACK,
-                fee_rate=DEFAULT_FEE_RATE,
-                slippage_rate=DEFAULT_SLIPPAGE_RATE,
-            )
-        base_target_exposure = base_result["target_exposure"].copy()
+        base_target_exposure = result["target_exposure"].copy()
     return result, trades, base_target_exposure, market_proxy_context
 
 

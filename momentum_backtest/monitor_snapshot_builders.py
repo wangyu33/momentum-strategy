@@ -23,16 +23,10 @@ try:
         load_backtest_reference_context,
         should_include_realtime_snapshot,
     )
-    from .run_backtest import (
-        DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD,
-        DEFAULT_LOOKBACK,
-        build_default_strategy_params,
-        build_signal_quality_score,
-        choose_signal_winner_with_margin,
-        filter_score_row_by_confirmation,
-        normalize_code,
-        resolve_strategy_universe,
-    )
+    from .core.config import DEFAULT_LOOKBACK
+    from .core.strategy import build_default_strategy_params
+    from .core.signals import build_quality_momentum_single_asset_signal
+    from .core.io import normalize_code
 except ImportError:
     from monitor_render import (
         build_confirmed_trade_reason,
@@ -48,16 +42,10 @@ except ImportError:
         load_backtest_reference_context,
         should_include_realtime_snapshot,
     )
-    from run_backtest import (
-        DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD,
-        DEFAULT_LOOKBACK,
-        build_default_strategy_params,
-        build_signal_quality_score,
-        choose_signal_winner_with_margin,
-        filter_score_row_by_confirmation,
-        normalize_code,
-        resolve_strategy_universe,
-    )
+    from core.config import DEFAULT_LOOKBACK
+    from core.strategy import build_default_strategy_params
+    from core.signals import build_quality_momentum_single_asset_signal
+    from core.io import normalize_code
 
 
 def build_leader_context(
@@ -81,54 +69,34 @@ def build_leader_context(
         }
 
     params = build_default_strategy_params()
-    active_risk_codes, active_defensive_codes = resolve_strategy_universe(
-        prices,
-        risk_codes=[str(code) for code in params.get('risk_codes', [])],
-        defensive_codes=[str(code) for code in params.get('defensive_codes', [])],
-    )
-    raw_mom, score = build_signal_quality_score(
+    signal, _, current_momentum, _ = build_quality_momentum_single_asset_signal(
         prices,
         lookback=DEFAULT_LOOKBACK,
-        method=str(params.get('signal_quality_method', 'raw')),
+        signal_quality_method=str(params.get('signal_quality_method', 'raw')),
         slope_penalty=float(params.get('signal_slope_penalty', 0.0)),
+        volatility_penalty=float(params.get('signal_volatility_penalty', 0.0)),
+        downside_volatility_penalty=float(params.get('signal_downside_volatility_penalty', 0.0)),
+        r2_penalty=float(params.get('signal_r2_penalty', 0.0)),
+        volatility_state_lookback=int(params.get('signal_volatility_state_lookback', 252)),
+        volatility_percentile_penalty=float(params.get('signal_volatility_percentile_penalty', 0.0)),
+        downside_volatility_percentile_penalty=float(params.get('signal_downside_volatility_percentile_penalty', 0.0)),
+        volatility_percentile_divisor=float(params.get('signal_volatility_percentile_divisor', 0.0)),
+        leader_margin=float(params.get('signal_leader_margin', 0.0)),
+        candidate_codes=[str(code) for code in prices.columns],
     )
-    risk_score = score[active_risk_codes]
-    defensive_score = score[active_defensive_codes]
-    risk_confirmation = None
-    if int(params.get('signal_confirmation_lookback', 0)) > 0 and int(params.get('signal_confirmation_top_n', 0)) > 0:
-        risk_confirmation = prices[active_risk_codes] / prices[active_risk_codes].shift(int(params.get('signal_confirmation_lookback', 0))) - 1
-    prev_risk = None
-    prev_def = None
-    risk_leader = None
-    def_leader = None
-    for dt in prices.index:
-        risk_score_row = risk_score.loc[dt]
-        if risk_confirmation is not None:
-            risk_score_row = filter_score_row_by_confirmation(risk_score_row, risk_confirmation.loc[dt], int(params.get('signal_confirmation_top_n', 0)))
-        risk_leader = choose_signal_winner_with_margin(risk_score_row, prev_risk, float(params.get('signal_leader_margin', 0.0)))
-        def_leader = choose_signal_winner_with_margin(defensive_score.loc[dt], prev_def, float(params.get('signal_leader_margin', 0.0)))
-        prev_risk = str(risk_leader) if risk_leader else None
-        prev_def = str(def_leader) if def_leader else None
-        if dt == latest_idx:
-            break
-
-    risk_code = normalize_code(risk_leader)
-    def_code = normalize_code(def_leader)
+    risk_code = normalize_code(signal.loc[latest_idx]) if latest_idx in signal.index else None
     risk_mom = None
-    def_mom = None
-    if risk_code and risk_code in raw_mom.columns and pd.notna(raw_mom.loc[latest_idx, risk_code]):
-        risk_mom = float(raw_mom.loc[latest_idx, risk_code])
-    if def_code and def_code in raw_mom.columns and pd.notna(raw_mom.loc[latest_idx, def_code]):
-        def_mom = float(raw_mom.loc[latest_idx, def_code])
+    if risk_code and latest_idx in current_momentum.index and pd.notna(current_momentum.loc[latest_idx]):
+        risk_mom = float(current_momentum.loc[latest_idx])
     return {
         'risk_leader': risk_code,
         'risk_leader_name': name_map.get(risk_code) if risk_code else None,
         'risk_leader_theme': theme_map.get(risk_code) if risk_code else None,
         'risk_leader_momentum': risk_mom,
-        'defensive_leader': def_code,
-        'defensive_leader_name': name_map.get(def_code) if def_code else None,
-        'defensive_leader_theme': theme_map.get(def_code) if def_code else None,
-        'defensive_leader_momentum': def_mom,
+        'defensive_leader': None,
+        'defensive_leader_name': None,
+        'defensive_leader_theme': None,
+        'defensive_leader_momentum': None,
     }
 
 
@@ -274,7 +242,11 @@ def build_position_and_trade_context(
     intraday_price_return = price_context["intraday_price_return"]
     base_exposure = float(base_target_exposure.loc[latest_idx]) if pd.notna(base_target_exposure.loc[latest_idx]) else None
     selected_momentum_percentile = None
-    if "selected_momentum_percentile" in result.columns and latest_idx in result.index and pd.notna(result.loc[latest_idx, "selected_momentum_percentile"]):
+    if (
+        "selected_momentum_percentile" in result.columns
+        and latest_idx in result.index
+        and pd.notna(result.loc[latest_idx, "selected_momentum_percentile"])
+    ):
         selected_momentum_percentile = float(result.loc[latest_idx, "selected_momentum_percentile"])
     selected_momentum_pct_cap_triggered = False
     if "selected_momentum_pct_cap_triggered" in result.columns and latest_idx in result.index:
@@ -301,10 +273,6 @@ def build_position_and_trade_context(
     elif base_exposure is not None and desired_exposure is not None and base_exposure - desired_exposure > 1e-12:
         # 兼容旧基线：历史结果未单独落 extra_cap 字段时，仍可从“基础目标仓位 > 当前目标仓位”推断发生了附加压仓。
         extra_cap_triggered = True
-
-    rebalance_threshold_blocked = False
-    if "rebalance_threshold_blocked" in result.columns and latest_idx in result.index:
-        rebalance_threshold_blocked = bool(result.loc[latest_idx, "rebalance_threshold_blocked"])
 
     trade_rows = pd.DataFrame()
     confirmed_trade_date = None
@@ -374,7 +342,6 @@ def build_position_and_trade_context(
         "top2_close_risk_cap": top2_close_risk_cap,
         "extra_cap_triggered": extra_cap_triggered,
         "extra_cap_reason": extra_cap_reason,
-        "rebalance_threshold_blocked": rebalance_threshold_blocked,
         "confirmed_trade_date": confirmed_trade_date,
         "trade_previous_allocations": trade_previous_allocations,
         "trade_current_allocations": trade_current_allocations,
@@ -498,7 +465,6 @@ def build_signal_snapshot(
     top2_close_risk_cap = position_and_trade["top2_close_risk_cap"]
     extra_cap_triggered = position_and_trade["extra_cap_triggered"]
     extra_cap_reason = position_and_trade["extra_cap_reason"]
-    rebalance_threshold_blocked = position_and_trade["rebalance_threshold_blocked"]
     confirmed_trade_date = position_and_trade["confirmed_trade_date"]
     trade_previous_allocations = position_and_trade["trade_previous_allocations"]
     trade_current_allocations = position_and_trade["trade_current_allocations"]
@@ -519,7 +485,6 @@ def build_signal_snapshot(
         top2_close_cap_triggered=top2_close_cap_triggered,
         top2_close_gap=top2_close_gap,
         top2_close_risk_cap=top2_close_risk_cap,
-        rebalance_threshold_blocked=rebalance_threshold_blocked,
         theme_map=theme_map,
         name_map=name_map,
         risk_leader=leader_context['risk_leader'],
@@ -554,7 +519,6 @@ def build_signal_snapshot(
         top2_close_cap_triggered=top2_close_cap_triggered,
         top2_close_gap=top2_close_gap,
         top2_close_risk_cap=top2_close_risk_cap,
-        rebalance_threshold_blocked=rebalance_threshold_blocked,
         theme_map=theme_map,
         name_map=name_map,
         risk_leader=leader_context['risk_leader'],
@@ -645,7 +609,6 @@ def build_signal_snapshot(
         top2_close_cap_triggered=top2_close_cap_triggered,
         top2_close_gap=top2_close_gap,
         top2_close_risk_cap=top2_close_risk_cap,
-        rebalance_threshold_blocked=rebalance_threshold_blocked,
         base_exposure=base_exposure,
         confirmed_trade_date=confirmed_trade_date,
         confirmed_trade_details=confirmed_trade_details,

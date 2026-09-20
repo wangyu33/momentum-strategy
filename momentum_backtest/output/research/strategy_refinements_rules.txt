@@ -1,3 +1,0 @@
-hysteresis_thresholds: enter risk > 6%, exit risk < 3%
-defensive_multihorizon: defensive ranking = 0.6 * 25d + 0.4 * 60d
-lead_margin_filter: do not switch when risk winner leads runner-up by < 1.5%

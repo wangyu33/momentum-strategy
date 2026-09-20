@@ -1,4 +1,0 @@
-heat_mode,annualized_return,sharpe_rf0,max_drawdown,max_drawdown_integral,trade_action_count,latest_portfolio,annualized_diff,sharpe_diff,max_drawdown_diff,max_drawdown_integral_diff,drawdown_integral_definition,drawdown_integral_recomputed
-legacy,0.2516770519668061,1.3045019143942478,-0.1896238403889111,31.455994866546153,1568,纳指ETF / 纳指ETF广发 (159941) 73%；沪深300 / 沪深300ETF华泰柏瑞 (510300) 27%,0.0,0.0,0.0,0.0,full_history,False
-risk_weighted,0.2481523279144324,1.277527951036728,-0.1896238403889111,31.4559948665462,1551,纳指ETF / 纳指ETF广发 (159941) 73%；沪深300 / 沪深300ETF华泰柏瑞 (510300) 27%,-0.0035247240523736,-0.0269739633575196,0.0,4.973799150320701e-14,full_history,False
-portfolio_weighted,0.2481523279144324,1.277527951036728,-0.1896238403889111,31.4559948665462,1551,纳指ETF / 纳指ETF广发 (159941) 73%；沪深300 / 沪深300ETF华泰柏瑞 (510300) 27%,-0.0035247240523736,-0.0269739633575196,0.0,4.973799150320701e-14,full_history,False

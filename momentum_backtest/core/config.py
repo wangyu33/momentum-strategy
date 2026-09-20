@@ -1,0 +1,92 @@
+"""正式策略核心配置与常量。"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pandas as pd
+
+
+OUTPUT_DIR = Path("momentum_backtest/output")
+CORE_OUTPUT_DIR = OUTPUT_DIR / "core"
+ANALYSIS_OUTPUT_DIR = OUTPUT_DIR / "analysis"
+MONITOR_OUTPUT_DIR = OUTPUT_DIR / "monitor"
+TRADE_CALENDAR_CACHE = MONITOR_OUTPUT_DIR / "trade_calendar_cache.csv"
+
+DEFAULT_LOOKBACK = 25
+DEFAULT_YEARS = 15
+DEFAULT_HISTORY_START = pd.Timestamp("2012-01-01")
+DEFAULT_FEE_RATE = 0.0003
+DEFAULT_SLIPPAGE_RATE = 0.0002
+DEFAULT_CASH_THRESHOLD = None
+DEFAULT_STRATEGY_NAME = "threshold_boll_extreme_cap"
+DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD = 0.05
+DEFAULT_WEAK_TREND_DEFENSIVE_WEIGHT = 0.80
+DEFAULT_DUAL_CASH_EXIT_THRESHOLD = 0.0
+DEFAULT_BOLL_HOT_CAP = 0.80
+DEFAULT_BOLL_HOT_BANDWIDTH_PCT = 0.80
+DEFAULT_BOLL_EXTREME_HOT_CAP = 0.4225
+DEFAULT_BOLL_EXTREME_HOT_BANDWIDTH_PCT = 0.90
+DEFAULT_SIGNAL_QUALITY_METHOD = "slope"
+DEFAULT_SIGNAL_SLOPE_PENALTY = 0.85
+DEFAULT_SIGNAL_LEADER_MARGIN = 0.0
+DEFAULT_CLOSE_TOP2_GAP = 0.005
+DEFAULT_CLOSE_TOP2_RISK_CAP = 0.70
+DEFAULT_STRESS_BOND_CODE = "511260"
+DEFAULT_STRESS_BOND_RISK_CAP = 0.0
+DEFAULT_STRESS_BOND_RATIO_CUT = 0.90
+DEFAULT_STRESS_BOND_BREADTH_CUT = -0.031
+DEFAULT_STRESS_BOND_ENTER_DAYS = 1
+DEFAULT_STRESS_BOND_EXIT_DAYS = 1
+DEFAULT_STRESS_BOND_FILL_RESIDUAL_CASH = False
+DEFAULT_BASELINE_DROP_CODES = ["511580", "513650"]
+DEFAULT_REGIME_MIX_AGGRESSIVE_CORE_WEIGHT = 0.28
+DEFAULT_REGIME_MIX_CONSERVATIVE_CORE_WEIGHT = 0.27
+DEFAULT_REGIME_MIX_MOMENTUM_CUT = 0.06
+DEFAULT_REGIME_MIX_VOLUME_RATIO_CUT = 0.91
+DEFAULT_REGIME_MIX_VOLUME_SHORT_RATIO_CUT = 0.90
+DEFAULT_REGIME_MIX_VOLUME_BREADTH_CUT = -0.04
+DEFAULT_REGIME_MIX_PROXY_KIND = "hybrid_breadth_blend"
+DEFAULT_REGIME_MIX_VOLUME_GUARD_CAP = 0.50
+DEFAULT_REGIME_MIX_VOLUME_GUARD_MOMENTUM_CEILING = 0.16
+DEFAULT_REGIME_MIX_OVERHEAT_DRAWDOWN_CUT = -0.02
+DEFAULT_REGIME_MIX_PRE_OVERHEAT_START_CUT = 0.15
+DEFAULT_REGIME_MIX_PRE_OVERHEAT_END_CUT = 0.20
+DEFAULT_REGIME_MIX_PRE_OVERHEAT_END_EXPOSURE = 0.90
+DEFAULT_REGIME_MIX_OVERHEAT_MOMENTUM_CUT = 0.25
+DEFAULT_REGIME_MIX_OVERHEAT_MAX_EXPOSURE = 0.30
+DEFAULT_REGIME_MIX_OVERHEAT_HIGH_MOMENTUM_CUT = 0.30
+DEFAULT_REGIME_MIX_OVERHEAT_HIGH_MAX_EXPOSURE = 0.10
+DEFAULT_REGIME_MIX_OVERHEAT_CAP_MODE = "continuous"
+
+FIXED_ETF_POOL = [
+    {"theme": "沪深300", "code": "510300", "name": "沪深300ETF华泰柏瑞", "sina_symbol": "sh510300"},
+    {"theme": "创业板50", "code": "159949", "name": "创业板50ETF华安", "sina_symbol": "sz159949"},
+    {"theme": "H股", "code": "159954", "name": "H股ETF", "sina_symbol": "sz159954"},
+    {"theme": "纳指ETF", "code": "159941", "name": "纳指ETF广发", "sina_symbol": "sz159941"},
+    {"theme": "标普500ETF", "code": "513650", "name": "标普500ETF南方", "sina_symbol": "sh513650"},
+    {"theme": "政金ETF", "code": "511580", "name": "国债政金债ETF招商", "sina_symbol": "sh511580"},
+    {"theme": "黄金ETF", "code": "518880", "name": "黄金ETF华安", "sina_symbol": "sh518880"},
+    {"theme": "日经ETF", "code": "513880", "name": "日经225ETF华安", "sina_symbol": "sh513880"},
+    {"theme": "红利低波ETF", "code": "512890", "name": "红利低波ETF华泰柏瑞", "sina_symbol": "sh512890"},
+    {"theme": "豆粕", "code": "159985", "name": "豆粕ETF", "sina_symbol": "sz159985"},
+]
+
+STRESS_BOND_ETF = {
+    "theme": "十年国债ETF",
+    "code": "511260",
+    "name": "十年国债ETF",
+    "sina_symbol": "sh511260",
+}
+
+RISK_CODES = ["510300", "159949", "159954", "159941", "513650", "513880"]
+DEFENSIVE_CODES = ["511580", "518880", "512890", "159985"]
+
+
+def load_default_strategy_pool() -> pd.DataFrame:
+    return pd.DataFrame([item for item in FIXED_ETF_POOL if item["code"] not in set(DEFAULT_BASELINE_DROP_CODES)])
+
+
+def load_default_strategy_backtest_pool() -> pd.DataFrame:
+    base_pool = load_default_strategy_pool()
+    return pd.concat([base_pool, pd.DataFrame([STRESS_BOND_ETF])], ignore_index=True)

@@ -34,15 +34,13 @@ try:
     )
     from .monitor_snapshot import classify_market_session, should_include_realtime_snapshot
     from .monitor_pipeline import build_price_panel
-    from .run_backtest import (
+    from .core.config import (
         CORE_OUTPUT_DIR,
         MONITOR_OUTPUT_DIR,
-        build_current_etf_momentum_percentile_table,
-        ensure_output_dirs,
-        is_trading_day,
         load_default_strategy_backtest_pool,
-        write_dataframe_csv_atomic,
     )
+    from .core.io import ensure_output_dirs, is_trading_day, write_dataframe_csv_atomic
+    from .core.signals import build_current_etf_momentum_percentile_table
 except ImportError:
     from monitor_delivery import (
         build_channel_plan,
@@ -55,15 +53,13 @@ except ImportError:
     )
     from monitor_snapshot import classify_market_session, should_include_realtime_snapshot
     from monitor_pipeline import build_price_panel
-    from run_backtest import (
+    from core.config import (
         CORE_OUTPUT_DIR,
         MONITOR_OUTPUT_DIR,
-        build_current_etf_momentum_percentile_table,
-        ensure_output_dirs,
-        is_trading_day,
         load_default_strategy_backtest_pool,
-        write_dataframe_csv_atomic,
     )
+    from core.io import ensure_output_dirs, is_trading_day, write_dataframe_csv_atomic
+    from core.signals import build_current_etf_momentum_percentile_table
 
 
 DEBUG_ENABLED = False
@@ -358,7 +354,7 @@ def main() -> int:
     )
     message = build_board_message(snapshot, board)
     export_board = board.copy()
-    for column in ["mom_25", "mom_25_percentile"]:
+    for column in ["mom_25"]:
         export_board[column] = export_board[column].map(format_pct)
     export_board["price"] = export_board["price"].map(lambda value: f"{value:.4f}")
     write_dataframe_csv_atomic(export_board, BOARD_CSV_FILE, index=False)

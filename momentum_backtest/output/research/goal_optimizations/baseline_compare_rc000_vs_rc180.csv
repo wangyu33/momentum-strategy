@@ -1,3 +1,0 @@
-baseline,total_return,annualized_return,annualized_volatility,sharpe_rf0,max_drawdown,max_drawdown_integral,trade_count,avg_exposure,latest_holding_code,latest_holding_theme,latest_holding_name,latest_momentum,latest_exposure,drawdown_integral_definition,drawdown_integral_recomputed
-old_rc180_vg000,22.22187717500405,0.2520215876684986,0.1929796946258714,1.3059487328814114,-0.1890166145032177,29.847704255280387,1584,0.8061282730214769,159949,创业板50,创业板50ETF华安,0.1430594900849859,1.0,full_history,False
-new_rc000_vg000,22.28755180618073,0.2522743002744789,0.1929066215195257,1.307753452355932,-0.1890166145032176,29.38426440299719,1559,0.8061282730214769,159949,创业板50,创业板50ETF华安,0.1430594900849859,1.0,full_history,False
