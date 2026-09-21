@@ -245,6 +245,12 @@ def apply_boll_hot_cap_to_target_weights(
     extreme_cap: float = DEFAULT_BOLL_EXTREME_HOT_CAP,
     extreme_bandwidth_pct_cut: float = DEFAULT_BOLL_EXTREME_HOT_BANDWIDTH_PCT,
 ) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+    """布林带过热压仓：普通层（cap）与极热层（extreme_cap）解耦。
+
+    两层独立开关：``cap >= 1.0`` 关闭普通压仓，``extreme_cap >= 1.0`` 关闭极热压仓。
+    旧实现用 ``total_weight <= cap`` 做前置短路，导致 cap>=1.0 时整层（含极热层）
+    被连带关闭，两层无法独立配置。这里改为分别判定 need_hot / need_extreme。
+    """
     adjusted = target_weights.reindex(index=prices.index, columns=prices.columns, fill_value=0.0).fillna(0.0).copy()
     signal = adjusted.idxmax(axis=1).where(adjusted.max(axis=1) > 1e-12, pd.NA)
 
@@ -266,13 +272,15 @@ def apply_boll_hot_cap_to_target_weights(
 
     triggered = pd.Series(False, index=adjusted.index, dtype=bool, name="boll_hot_cap_triggered")
     extreme_triggered = pd.Series(False, index=adjusted.index, dtype=bool, name="boll_extreme_hot_cap_triggered")
+    hot_enabled = cap < 1.0
+    extreme_enabled = extreme_cap < 1.0
+    if not hot_enabled and not extreme_enabled:
+        return adjusted, triggered, extreme_triggered
+
+    gate_pct_cut = min(bandwidth_pct_cut, extreme_bandwidth_pct_cut)
     for dt_idx in adjusted.index:
         signal_code = normalize_code(signal.loc[dt_idx])
         if signal_code is None or signal_code not in adjusted.columns:
-            continue
-
-        original_total_weight = float(adjusted.loc[dt_idx].sum())
-        if original_total_weight <= cap + 1e-12:
             continue
 
         price_now = prices.loc[dt_idx, signal_code]
@@ -280,14 +288,28 @@ def apply_boll_hot_cap_to_target_weights(
         bandwidth_pct = bandwidth_pct120.loc[dt_idx, signal_code]
         if pd.isna(price_now) or pd.isna(upper_now) or pd.isna(bandwidth_pct):
             continue
-        if float(price_now) < float(upper_now) or float(bandwidth_pct) < bandwidth_pct_cut:
+        if float(price_now) < float(upper_now) or float(bandwidth_pct) < gate_pct_cut:
             continue
 
-        triggered.loc[dt_idx] = True
-        target_cap = cap
-        if float(bandwidth_pct) >= extreme_bandwidth_pct_cut:
-            target_cap = min(target_cap, extreme_cap)
+        original_total_weight = float(adjusted.loc[dt_idx].sum())
+        need_hot = hot_enabled and original_total_weight > cap + 1e-12 and float(bandwidth_pct) >= bandwidth_pct_cut
+        need_extreme = (
+            extreme_enabled
+            and original_total_weight > extreme_cap + 1e-12
+            and float(bandwidth_pct) >= extreme_bandwidth_pct_cut
+        )
+        if not need_hot and not need_extreme:
+            continue
+
+        target_cap = 1.0
+        if need_hot:
+            triggered.loc[dt_idx] = True
+            target_cap = min(target_cap, cap)
+        if need_extreme:
             extreme_triggered.loc[dt_idx] = True
+            target_cap = min(target_cap, extreme_cap)
+        if target_cap >= 1.0 - 1e-12:
+            continue
         adjusted.loc[dt_idx, :] = adjusted.loc[dt_idx, :] * (target_cap / original_total_weight)
 
     return adjusted, triggered, extreme_triggered
