@@ -4,7 +4,16 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .config import DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD, DEFAULT_CASH_THRESHOLD, DEFAULT_DUAL_CASH_EXIT_THRESHOLD, DEFAULT_FEE_RATE, DEFAULT_SLIPPAGE_RATE, DEFAULT_WEAK_TREND_DEFENSIVE_WEIGHT
+from .config import (
+    DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD,
+    DEFAULT_CASH_THRESHOLD,
+    DEFAULT_DUAL_CASH_EXIT_THRESHOLD,
+    DEFAULT_FEE_RATE,
+    DEFAULT_SIGNAL_QUALITY_METHOD,
+    DEFAULT_SIGNAL_SLOPE_PENALTY,
+    DEFAULT_SLIPPAGE_RATE,
+    DEFAULT_WEAK_TREND_DEFENSIVE_WEIGHT,
+)
 from .io import normalize_code
 from .signals import build_threshold_dual_signal
 
@@ -309,6 +318,17 @@ def run_threshold_dual_strategy(
     cash_exit_threshold: float = DEFAULT_DUAL_CASH_EXIT_THRESHOLD,
     risk_codes: list[str] | None = None,
     defensive_codes: list[str] | None = None,
+    signal_quality_method: str = DEFAULT_SIGNAL_QUALITY_METHOD,
+    slope_penalty: float = DEFAULT_SIGNAL_SLOPE_PENALTY,
+    volatility_penalty: float = 0.0,
+    downside_volatility_penalty: float = 0.0,
+    r2_penalty: float = 0.0,
+    volatility_percentile_divisor: float = 0.0,
+    confirmation_lookback: int = 0,
+    confirmation_top_n: int = 0,
+    secondary_stability_method: str = "none",
+    secondary_stability_gap: float = 0.0,
+    leader_margin: float = 0.0,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     returns = prices.pct_change(fill_method=None)
     signal, target_exposure, current_momentum, max_momentum = build_threshold_dual_signal(
@@ -317,6 +337,17 @@ def run_threshold_dual_strategy(
         absolute_threshold=absolute_threshold,
         weak_trend_defensive_weight=weak_trend_defensive_weight,
         cash_exit_threshold=cash_exit_threshold,
+        signal_quality_method=signal_quality_method,
+        slope_penalty=slope_penalty,
+        volatility_penalty=volatility_penalty,
+        downside_volatility_penalty=downside_volatility_penalty,
+        r2_penalty=r2_penalty,
+        volatility_percentile_divisor=volatility_percentile_divisor,
+        confirmation_lookback=confirmation_lookback,
+        confirmation_top_n=confirmation_top_n,
+        secondary_stability_method=secondary_stability_method,
+        secondary_stability_gap=secondary_stability_gap,
+        leader_margin=leader_margin,
         risk_codes=risk_codes,
         defensive_codes=defensive_codes,
     )

@@ -1520,6 +1520,8 @@ def run_default_strategy(
         cash_exit_threshold=DEFAULT_DUAL_CASH_EXIT_THRESHOLD,
         risk_codes=list(RISK_CODES),
         defensive_codes=list(DEFENSIVE_CODES),
+        signal_quality_method=DEFAULT_SIGNAL_QUALITY_METHOD,
+        slope_penalty=DEFAULT_SIGNAL_SLOPE_PENALTY,
     )
     base_target_weights = base_result[[col for col in base_result.columns if col.startswith("weight_")]].copy()
     base_target_weights.columns = [col.removeprefix("weight_") for col in base_target_weights.columns]
