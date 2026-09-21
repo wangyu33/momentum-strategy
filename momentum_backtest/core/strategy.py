@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pandas as pd
 from .backtest import (
     build_trades_from_weight_frame,
@@ -16,6 +17,15 @@ from .backtest import (
 )
 from .config import (
     DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD,
+    DEFAULT_ASSET_PERCENTILE_CAP_CODES,
+    DEFAULT_ASSET_PERCENTILE_CAP_EXTREME_CAP,
+    DEFAULT_ASSET_PERCENTILE_CAP_HIGH,
+    DEFAULT_ASSET_PERCENTILE_CAP_HIGH_CAP,
+    DEFAULT_ASSET_PERCENTILE_CAP_MID,
+    DEFAULT_ASSET_PERCENTILE_CAP_MID_CAP,
+    DEFAULT_ASSET_PERCENTILE_CAP_MIN_PERIODS,
+    DEFAULT_ASSET_PERCENTILE_CAP_START,
+    DEFAULT_ASSET_PERCENTILE_CAP_STATE_LOOKBACK,
     DEFAULT_BASELINE_DROP_CODES,
     DEFAULT_BOLL_EXTREME_HOT_BANDWIDTH_PCT,
     DEFAULT_BOLL_EXTREME_HOT_CAP,
@@ -26,6 +36,8 @@ from .config import (
     DEFAULT_DUAL_CASH_EXIT_THRESHOLD,
     DEFAULT_FEE_RATE,
     DEFAULT_LOOKBACK,
+    DEFAULT_MA_TREND_CUT,
+    DEFAULT_MA_TREND_WINDOW,
     DEFAULT_REGIME_MIX_AGGRESSIVE_CORE_WEIGHT,
     DEFAULT_REGIME_MIX_CONSERVATIVE_CORE_WEIGHT,
     DEFAULT_REGIME_MIX_MOMENTUM_CUT,
@@ -43,6 +55,7 @@ from .config import (
     DEFAULT_REGIME_MIX_VOLUME_GUARD_MOMENTUM_CEILING,
     DEFAULT_REGIME_MIX_VOLUME_RATIO_CUT,
     DEFAULT_REGIME_MIX_VOLUME_SHORT_RATIO_CUT,
+    DEFAULT_RISK_POOL_INCLUDE_TREASURY,
     DEFAULT_SIGNAL_LEADER_MARGIN,
     DEFAULT_SIGNAL_QUALITY_METHOD,
     DEFAULT_SIGNAL_SLOPE_PENALTY,
@@ -278,6 +291,78 @@ def apply_boll_hot_cap_to_target_weights(
         adjusted.loc[dt_idx, :] = adjusted.loc[dt_idx, :] * (target_cap / original_total_weight)
 
     return adjusted, triggered, extreme_triggered
+
+
+def apply_asset_momentum_percentile_cap_to_target_weights(
+    prices: pd.DataFrame,
+    target_weights: pd.DataFrame,
+    *,
+    asset_codes: list[str] | None = None,
+    cap_start: float = DEFAULT_ASSET_PERCENTILE_CAP_START,
+    cap_mid: float = DEFAULT_ASSET_PERCENTILE_CAP_MID,
+    mid_cap: float = DEFAULT_ASSET_PERCENTILE_CAP_MID_CAP,
+    cap_high: float = DEFAULT_ASSET_PERCENTILE_CAP_HIGH,
+    high_cap: float = DEFAULT_ASSET_PERCENTILE_CAP_HIGH_CAP,
+    extreme_cap: float = DEFAULT_ASSET_PERCENTILE_CAP_EXTREME_CAP,
+    state_lookback: int = DEFAULT_ASSET_PERCENTILE_CAP_STATE_LOOKBACK,
+    min_periods: int = DEFAULT_ASSET_PERCENTILE_CAP_MIN_PERIODS,
+) -> tuple[pd.DataFrame, pd.Series, pd.Series, pd.Series, pd.Series]:
+    adjusted = target_weights.reindex(index=prices.index, columns=prices.columns, fill_value=0.0).fillna(0.0).copy()
+    selected_pct = pd.Series(index=adjusted.index, dtype="float64", name="asset_momentum_percentile")
+    cap_series = pd.Series(1.0, index=adjusted.index, dtype="float64", name="asset_momentum_percentile_cap")
+    triggered = pd.Series(False, index=adjusted.index, dtype=bool, name="asset_momentum_percentile_cap_triggered")
+    triggered_asset = pd.Series(pd.NA, index=adjusted.index, dtype="object", name="asset_momentum_percentile_cap_code")
+
+    effective_asset_codes = [
+        code for code in (DEFAULT_ASSET_PERCENTILE_CAP_CODES if asset_codes is None else asset_codes)
+        if code in adjusted.columns and code in prices.columns
+    ]
+    if not effective_asset_codes:
+        return adjusted, selected_pct, cap_series, triggered, triggered_asset
+
+    signal_pct = build_asset_own_momentum_percentile(
+        prices[effective_asset_codes],
+        lookback=DEFAULT_LOOKBACK,
+        state_lookback=state_lookback,
+        min_periods=min_periods,
+    )
+
+    for asset_code in effective_asset_codes:
+        for dt_idx in adjusted.index:
+            asset_weight = float(adjusted.loc[dt_idx, asset_code]) if pd.notna(adjusted.loc[dt_idx, asset_code]) else 0.0
+            if asset_weight <= 1e-12:
+                continue
+
+            pct_value = signal_pct.loc[dt_idx, asset_code]
+            if pd.isna(pct_value):
+                continue
+
+            pct_value = float(pct_value)
+            selected_pct.loc[dt_idx] = pct_value
+            triggered_asset.loc[dt_idx] = asset_code
+            cap_value = None
+            if cap_start <= pct_value < cap_mid:
+                progress = min(max((pct_value - cap_start) / (cap_mid - cap_start), 0.0), 1.0)
+                cap_value = 1.0 + (mid_cap - 1.0) * progress
+            elif cap_mid <= pct_value < cap_high:
+                if cap_high > cap_mid:
+                    progress = min(max((pct_value - cap_mid) / (cap_high - cap_mid), 0.0), 1.0)
+                    cap_value = mid_cap + (high_cap - mid_cap) * progress
+                else:
+                    cap_value = high_cap
+            elif pct_value >= cap_high:
+                cap_value = extreme_cap
+
+            if cap_value is None:
+                continue
+
+            total_weight = float(adjusted.loc[dt_idx].sum())
+            cap_series.loc[dt_idx] = cap_value
+            if total_weight > cap_value + 1e-12:
+                adjusted.loc[dt_idx, :] = adjusted.loc[dt_idx, :] * (cap_value / total_weight)
+                triggered.loc[dt_idx] = True
+
+    return adjusted, selected_pct, cap_series, triggered, triggered_asset
 
 
 def apply_defensive_signal_momentum_pct_cap_to_target_weights(
@@ -1002,9 +1087,12 @@ def build_default_strategy_params(
     risk_codes: list[str] | None = None,
     defensive_codes: list[str] | None = None,
 ) -> dict[str, object]:
+    base_risk_codes = list(RISK_CODES if risk_codes is None else risk_codes)
+    if DEFAULT_RISK_POOL_INCLUDE_TREASURY and DEFAULT_STRESS_BOND_CODE not in base_risk_codes:
+        base_risk_codes.append(DEFAULT_STRESS_BOND_CODE)
     return {
         "drop_codes": list(DEFAULT_BASELINE_DROP_CODES if drop_codes is None else drop_codes),
-        "risk_codes": list(RISK_CODES if risk_codes is None else risk_codes),
+        "risk_codes": base_risk_codes,
         "defensive_codes": list(DEFENSIVE_CODES if defensive_codes is None else defensive_codes),
         "proxy_kind": DEFAULT_REGIME_MIX_PROXY_KIND,
         "signal_quality_method": DEFAULT_SIGNAL_QUALITY_METHOD,
@@ -1070,6 +1158,8 @@ def build_default_strategy_params(
         "defensive_signal_selected_momentum_pct_cap_start": 1.0,
         "defensive_signal_selected_momentum_pct_cap_floor": 1.0,
         "target_min_rebalance_threshold": 0.0,
+        "ma_trend_window": DEFAULT_MA_TREND_WINDOW,
+        "ma_trend_cut": DEFAULT_MA_TREND_CUT,
     }
 
 
@@ -1160,6 +1250,46 @@ def apply_persistent_overlay(
     if return_target_weights:
         return result, trades, overlaid_weights
     return result, trades
+
+
+def apply_ma_trend_cut_to_target_weights(
+    prices: pd.DataFrame,
+    target_weights: pd.DataFrame,
+    window: int = DEFAULT_MA_TREND_WINDOW,
+    cut: float = DEFAULT_MA_TREND_CUT,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """持仓标的收盘价跌破自身 window 日均线时，按 cut 比例缩减当日目标权重。
+
+    返回 (调整后权重, 触发掩码)。window<=0 或 cut>=1 时原样返回，相当于关闭。
+    """
+    triggered = pd.Series(False, index=target_weights.index, name="ma_trend_triggered")
+    if window <= 0 or cut >= 1.0:
+        return target_weights, triggered
+    moving_avg = prices.rolling(window).mean()
+    holding = target_weights.idxmax(axis=1)
+    current_price = pd.Series(
+        [
+            float(prices.loc[dt, code])
+            if code in prices.columns and pd.notna(prices.loc[dt, code])
+            else np.nan
+            for dt, code in zip(target_weights.index, holding)
+        ],
+        index=target_weights.index,
+    )
+    ma_price = pd.Series(
+        [
+            float(moving_avg.loc[dt, code])
+            if code in moving_avg.columns and pd.notna(moving_avg.loc[dt, code])
+            else np.nan
+            for dt, code in zip(target_weights.index, holding)
+        ],
+        index=target_weights.index,
+    )
+    invested = target_weights.sum(axis=1) > 1e-9
+    triggered = ((current_price < ma_price).fillna(False)) & invested
+    triggered = triggered.rename("ma_trend_triggered")
+    adjusted = target_weights.mul(np.where(triggered.to_numpy(), cut, 1.0), axis=0)
+    return adjusted, triggered
 
 
 def run_default_strategy_with_params(
@@ -1274,9 +1404,21 @@ def run_default_strategy_with_params(
             rebalance_threshold,
         )
 
+    ma_trend_triggered = None
+    ma_trend_window = int(params.get("ma_trend_window", DEFAULT_MA_TREND_WINDOW))
+    ma_trend_cut = float(params.get("ma_trend_cut", DEFAULT_MA_TREND_CUT))
+    if ma_trend_window > 0 and ma_trend_cut < 1.0:
+        target_weights, ma_trend_triggered = apply_ma_trend_cut_to_target_weights(
+            prices,
+            target_weights,
+            window=ma_trend_window,
+            cut=ma_trend_cut,
+        )
+
     if (
         post_overlay_selected_momentum_percentile is not None
         or post_overlay_threshold_blocked is not None
+        or ma_trend_triggered is not None
     ):
         result, trades = run_target_weights_strategy(
             prices,
@@ -1352,6 +1494,8 @@ def run_default_strategy_with_params(
         result["overheat_stability_cap_triggered"] = base_result["overheat_stability_cap_triggered"].reindex(result.index).fillna(False)
     result["target_exposure"] = target_weights.sum(axis=1).rename("target_exposure")
     result["stress_bond_trigger"] = stress_mask
+    if ma_trend_triggered is not None:
+        result["ma_trend_triggered"] = ma_trend_triggered.reindex(result.index).fillna(False)
     if post_overlay_threshold_blocked is not None:
         result["rebalance_threshold_blocked"] = post_overlay_threshold_blocked.reindex(result.index).fillna(False)
     result = pd.concat([result, target_weights.add_prefix("target_weight_")], axis=1)
@@ -1374,17 +1518,31 @@ def run_default_strategy(
         absolute_threshold=DEFAULT_ABSOLUTE_MOMENTUM_THRESHOLD,
         weak_trend_defensive_weight=DEFAULT_WEAK_TREND_DEFENSIVE_WEIGHT,
         cash_exit_threshold=DEFAULT_DUAL_CASH_EXIT_THRESHOLD,
+        risk_codes=list(RISK_CODES),
+        defensive_codes=list(DEFENSIVE_CODES),
     )
     base_target_weights = base_result[[col for col in base_result.columns if col.startswith("weight_")]].copy()
     base_target_weights.columns = [col.removeprefix("weight_") for col in base_target_weights.columns]
-    target_weights, boll_hot_triggered, boll_extreme_hot_triggered = apply_boll_hot_cap_to_target_weights(
+    target_weights, asset_pct_rank, asset_pct_cap, asset_pct_cap_triggered, asset_pct_cap_code = apply_asset_momentum_percentile_cap_to_target_weights(
         prices,
         base_target_weights,
+    )
+    target_weights, boll_hot_triggered, boll_extreme_hot_triggered = apply_boll_hot_cap_to_target_weights(
+        prices,
+        target_weights,
         cap=DEFAULT_BOLL_HOT_CAP,
         bandwidth_pct_cut=DEFAULT_BOLL_HOT_BANDWIDTH_PCT,
         extreme_cap=DEFAULT_BOLL_EXTREME_HOT_CAP,
         extreme_bandwidth_pct_cut=DEFAULT_BOLL_EXTREME_HOT_BANDWIDTH_PCT,
     )
+    ma_trend_triggered = None
+    if DEFAULT_MA_TREND_WINDOW > 0 and DEFAULT_MA_TREND_CUT < 1.0:
+        target_weights, ma_trend_triggered = apply_ma_trend_cut_to_target_weights(
+            prices,
+            target_weights,
+            window=DEFAULT_MA_TREND_WINDOW,
+            cut=DEFAULT_MA_TREND_CUT,
+        )
     result, _ = run_target_weights_strategy(
         prices,
         selected,
@@ -1412,11 +1570,21 @@ def run_default_strategy(
     result["signal_asset_momentum"] = signal_momentum
     result["base_target_exposure"] = base_target_weights.sum(axis=1).rename("base_target_exposure")
     result["target_exposure"] = target_weights.sum(axis=1).rename("target_exposure")
+    result["asset_momentum_percentile"] = asset_pct_rank.reindex(result.index)
+    result["asset_momentum_percentile_cap"] = asset_pct_cap.reindex(result.index).fillna(1.0)
+    result["asset_momentum_percentile_cap_triggered"] = asset_pct_cap_triggered.reindex(result.index).fillna(False)
+    result["asset_momentum_percentile_cap_code"] = asset_pct_cap_code.reindex(result.index)
     result["boll_hot_cap_triggered"] = boll_hot_triggered.reindex(result.index).fillna(False)
     result["boll_extreme_hot_cap_triggered"] = boll_extreme_hot_triggered.reindex(result.index).fillna(False)
-    result["extra_cap_triggered"] = boll_hot_triggered.reindex(result.index).fillna(False)
+    result["extra_cap_triggered"] = (
+        asset_pct_cap_triggered.reindex(result.index).fillna(False)
+        | boll_hot_triggered.reindex(result.index).fillna(False)
+    )
     result["extra_cap_reason"] = pd.Series(pd.NA, index=result.index, dtype="object")
+    result.loc[result["asset_momentum_percentile_cap_triggered"], "extra_cap_reason"] = "asset_momentum_percentile_cap"
     result.loc[result["boll_hot_cap_triggered"], "extra_cap_reason"] = "boll_hot_cap"
     result.loc[result["boll_extreme_hot_cap_triggered"], "extra_cap_reason"] = "boll_extreme_hot_cap"
+    if ma_trend_triggered is not None:
+        result["ma_trend_triggered"] = ma_trend_triggered.reindex(result.index).fillna(False)
     result = pd.concat([result, target_weights.add_prefix("target_weight_")], axis=1)
     return result, trades

@@ -369,6 +369,7 @@ def describe_extra_cap_reason(
     if base_exposure is not None and desired_exposure is not None:
         transition = f" {format_allocation_percent(base_exposure)} -> {format_allocation_percent(desired_exposure)}"
     mapping = {
+        "asset_momentum_percentile_cap": f"标的高分位控仓{transition}".strip(),
         "pre_overheat_cap": f"预减仓缩放{transition}".strip(),
         "mid_overheat_cap": f"过热连续缩放{transition}".strip(),
         "overheat_cap": f"过热压仓{transition}".strip(),
