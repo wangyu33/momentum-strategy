@@ -93,12 +93,20 @@ def filter_indexed_frame_to_confirmed_closes(
 
 
 def fetch_realtime_etf_prices() -> dict[str, float]:
+    """抓取 ETF 实时价。
+
+    停牌 / 无成交的标的，东财会返回 0 或 "-"，新浪也会返回 0。
+    这类值必须**当作缺失剔除**——否则 0 价会被当成真实价格参与计算，
+    得到「盘中收益 -100%」「净值归零」「回撤 -100%」这类荒谬结果。
+    返回字典里只包含价格 > 0 的标的；取不到的标的由下游回退到最近收盘价。
+    """
     errors: list[str] = []
     try:
         spot = ak.fund_etf_spot_em().copy()
         spot["代码"] = spot["代码"].astype(str)
         spot["最新价"] = pd.to_numeric(spot["最新价"], errors="coerce")
         spot = spot[["代码", "最新价"]].dropna()
+        spot = spot[spot["最新价"] > 0]
         if not spot.empty:
             return dict(zip(spot["代码"], spot["最新价"]))
     except Exception as exc:
@@ -109,6 +117,7 @@ def fetch_realtime_etf_prices() -> dict[str, float]:
         spot["代码"] = spot["代码"].astype(str).str.replace(r"^(sh|sz)", "", regex=True)
         spot["最新价"] = pd.to_numeric(spot["最新价"], errors="coerce")
         spot = spot[["代码", "最新价"]].dropna()
+        spot = spot[spot["最新价"] > 0]
         if not spot.empty:
             return dict(zip(spot["代码"], spot["最新价"]))
     except Exception as exc:

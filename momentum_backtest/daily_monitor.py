@@ -211,6 +211,7 @@ class SignalSnapshot:
     current_price: float | None
     previous_close_price: float | None
     intraday_price_return: float | None
+    price_source: str | None
     market_session_label: str | None
     live_nav_coverage: float | None
     market_volume_mode: str | None
@@ -330,6 +331,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--force", action="store_true", help="忽略状态缓存并写入新状态；适合正式补发，且允许非交易日手动补发。")
     parser.add_argument("--preview-send", action="store_true", help="发送当前快照但不读写去重状态；人工补发默认应使用这个参数，且允许非交易日手动补发。")
     parser.add_argument("--debug", action="store_true", help="输出调试日志到 stderr。")
+    parser.add_argument("--dry-run", action="store_true", help="只构建快照并打印通知文本，不发送、不写状态；用于排查数据异常。")
     parser.add_argument("--webhook-url", type=str, default="", help="临时指定飞书机器人 webhook。")
     parser.set_defaults(disable_direct_feishu=False)
     parser.add_argument("--disable-direct-feishu", dest="disable_direct_feishu", action="store_true", help="关闭直连飞书私信，仅保留 webhook。")
@@ -419,6 +421,17 @@ def main() -> int:
         f"holding={snapshot.current_holding}, desired={snapshot.desired_holding}, exposure={snapshot.current_exposure}, "
         f"slot={snapshot.delivery_slot or 'manual'}"
     )
+    if args.dry_run:
+        # 只构建快照并打印将要发出的通知文本：不发消息、不写状态。
+        # 用于排查「数字看着不对」这类问题，不必真的打扰订阅者。
+        log("dry_run mode enabled: print messages only, no delivery, no state write")
+        print("=" * 60)
+        print(market_message)
+        print("-" * 60)
+        print(trade_message)
+        print("=" * 60)
+        return 0
+
     state = {} if args.preview_send else load_state(state_file)
     channels = build_channel_plan(disable_direct_feishu=args.disable_direct_feishu, webhook_url=webhook_url)
     if args.preview_send:

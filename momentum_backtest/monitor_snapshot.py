@@ -160,6 +160,10 @@ def build_entry_risk_context(
 
     momentum_percentile = None
     drawdown_buffer_ratio = None
+    # 防御：回撤不可能 ≤ -100%，也不可能为正。出现这种值说明上游数据有脏值
+    # （例如停牌标的被填成 0 价），此时按「未知」处理，避免污染分桶与风险分
+    if current_drawdown is not None and (current_drawdown <= -0.999 or current_drawdown > 0):
+        current_drawdown = None
     if current_mom is not None and not hist_momentum.empty:
         momentum_percentile = float((hist_momentum <= current_mom).mean())
     if current_drawdown is not None and max_drawdown is not None and max_drawdown < 0:
@@ -243,32 +247,42 @@ def build_asset_price_context(
     previous_close_price = None
     intraday_price_return = None
     current_price_from_spot = False
+    price_source = None           # 实时价 / 停牌沿用收盘 / 收盘
     if asset_code_norm is not None and asset_code_norm in prices.columns:
         latest_price = spot_prices.get(asset_code_norm)
         history = prices[asset_code_norm].dropna()
         latest_history_date = pd.Timestamp(history.index[-1]).normalize() if not history.empty else None
         has_same_day_snapshot = latest_history_date is not None and latest_history_date == pd.Timestamp(prices.index[-1]).normalize()
 
-        if pd.notna(latest_price):
+        # 停牌标的：接口给 0 或缺失，都视为「无实时价」，一律回退到最近收盘价，
+        # 并标记为停牌，避免下游把 0 当成真实价格算出 -100% 的盘中收益
+        has_spot = latest_price is not None and pd.notna(latest_price) and float(latest_price) > 0
+        if has_spot:
             current_price = float(latest_price)
             current_price_from_spot = True
-        elif session_label == "收盘后" and not history.empty:
+            price_source = "实时价"
+        elif not history.empty:
             current_price = float(history.iloc[-1])
+            price_source = "停牌沿用收盘" if session_label != "收盘后" else "收盘"
 
         prev_close = raw_closes.get(asset_code_norm)
-        if pd.notna(prev_close):
+        if prev_close is not None and pd.notna(prev_close) and float(prev_close) > 0:
             previous_close_price = float(prev_close)
         elif not current_price_from_spot and current_price is not None and has_same_day_snapshot and len(history) >= 2:
             previous_close_price = float(history.iloc[-2])
         elif not current_price_from_spot and not history.empty:
             previous_close_price = float(history.iloc[-1])
 
+        # 只在拿到真实实时价时才算盘中收益；停牌沿用收盘价时收益为 0（价格没动）
         if current_price is not None and previous_close_price not in (None, 0.0):
             intraday_price_return = current_price / previous_close_price - 1
+            if not current_price_from_spot:
+                intraday_price_return = 0.0
     return {
         "current_price": current_price,
         "previous_close_price": previous_close_price,
         "intraday_price_return": intraday_price_return,
+        "price_source": price_source,
     }
 
 
@@ -298,10 +312,17 @@ def estimate_live_nav(
         if abs(weight) < 1e-12:
             continue
         prev_close = raw_closes.get(code)
+        if prev_close in (None, 0.0) or pd.isna(prev_close):
+            continue
         current_price = spot_prices.get(code)
-        if prev_close in (None, 0.0) or current_price is None or pd.isna(current_price):
+        # 停牌标的没有实时价（或接口返回 0）：跳过，不计入盘中收益，
+        # 其权重也不计入覆盖率——否则 0 价会让组合净值直接归零
+        if current_price is None or pd.isna(current_price) or float(current_price) <= 0:
             continue
         intraday_ret = float(current_price) / float(prev_close) - 1.0
+        # 单日跌超 90% 只可能是数据错误（停牌、除权口径错配、脏数据），直接丢弃
+        if intraday_ret <= -0.9 or intraday_ret >= 10.0:
+            continue
         invested_return += weight * intraday_ret
         covered_weight += weight
 

@@ -134,7 +134,7 @@ def build_reference_and_risk_context(
     live_nav_coverage = None
     if should_include_realtime_snapshot(market_session_label):
         estimated_live_nav, coverage = estimate_live_nav(close_result, current_nav, spot_prices, raw_closes)
-    if estimated_live_nav is not None:
+    if estimated_live_nav is not None and estimated_live_nav > 0:
         live_nav = estimated_live_nav
         live_nav_date = str(prices.index[-1].date())
         live_nav_coverage = coverage
@@ -143,10 +143,17 @@ def build_reference_and_risk_context(
         live_nav_date = nav_date
         live_nav_coverage = coverage
     elif "nav" in result.columns and not result["nav"].dropna().empty:
-        live_nav = float(result["nav"].dropna().iloc[-1])
-        live_nav_date = str(pd.Timestamp(result["nav"].dropna().index[-1]).date())
+        candidate_nav = float(result["nav"].dropna().iloc[-1])
+        # 净值 <= 0 只可能是脏数据（如停牌标的被填成 0 价），不能用来算回撤
+        if candidate_nav > 0:
+            live_nav = candidate_nav
+            live_nav_date = str(pd.Timestamp(result["nav"].dropna().index[-1]).date())
 
-    can_promote_live_nav = live_nav is not None and (live_nav_coverage is None or live_nav_coverage >= 0.999)
+    can_promote_live_nav = (
+        live_nav is not None
+        and live_nav > 0
+        and (live_nav_coverage is None or live_nav_coverage >= 0.999)
+    )
     if can_promote_live_nav:
         reference_peak = peak_nav_value if peak_nav_value is not None else live_nav
         effective_peak = max(reference_peak, live_nav)
@@ -237,6 +244,7 @@ def build_position_and_trade_context(
     current_price = price_context["current_price"]
     previous_close_price = price_context["previous_close_price"]
     intraday_price_return = price_context["intraday_price_return"]
+    price_source = price_context.get("price_source")
     base_exposure = float(base_target_exposure.loc[latest_idx]) if pd.notna(base_target_exposure.loc[latest_idx]) else None
     selected_momentum_percentile = None
     if (
@@ -331,6 +339,7 @@ def build_position_and_trade_context(
         "current_price": current_price,
         "previous_close_price": previous_close_price,
         "intraday_price_return": intraday_price_return,
+        "price_source": price_source,
         "base_exposure": base_exposure,
         "selected_momentum_percentile": selected_momentum_percentile,
         "selected_momentum_pct_cap_triggered": selected_momentum_pct_cap_triggered,
@@ -454,6 +463,7 @@ def build_signal_snapshot(
     current_price = position_and_trade["current_price"]
     previous_close_price = position_and_trade["previous_close_price"]
     intraday_price_return = position_and_trade["intraday_price_return"]
+    price_source = position_and_trade.get("price_source")
     base_exposure = position_and_trade["base_exposure"]
     selected_momentum_percentile = position_and_trade["selected_momentum_percentile"]
     selected_momentum_pct_cap_triggered = position_and_trade["selected_momentum_pct_cap_triggered"]
@@ -571,6 +581,7 @@ def build_signal_snapshot(
         current_price=current_price,
         previous_close_price=previous_close_price,
         intraday_price_return=intraday_price_return,
+        price_source=price_source,
         market_session_label=market_session_label,
         live_nav_coverage=live_nav_coverage,
         market_volume_mode=str(market_proxy_context.get("mode")) if market_proxy_context.get("mode") is not None else None,

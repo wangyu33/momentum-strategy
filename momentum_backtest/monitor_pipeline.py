@@ -88,8 +88,12 @@ def build_price_panel(
         if raw_closes is None:
             raw_closes = {}
         for code in prices.columns:
-            if code in spot_prices and pd.notna(spot_prices[code]):
-                latest_spot = float(spot_prices[code])
+            raw_spot = spot_prices.get(code)
+            # 停牌/无成交时接口可能返回 0，0 不是合法价格，必须按缺失处理
+            if raw_spot is None or pd.isna(raw_spot) or float(raw_spot) <= 0:
+                continue
+            if code in spot_prices:
+                latest_spot = float(raw_spot)
                 prev_raw_close = raw_closes.get(code)
                 history_before_today = prices.loc[prices.index < today_ts, code].dropna()
                 prev_adjusted_close = float(history_before_today.iloc[-1]) if not history_before_today.empty else None

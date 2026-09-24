@@ -394,6 +394,31 @@ def format_market_volume_summary(snapshot: Any) -> tuple[str, str]:
     return mode, summary
 
 
+def format_suspension_note(snapshot: Any) -> str | None:
+    """停牌 / 取不到实时价时的说明。
+
+    停牌标的的接口价是 0 或缺失，此时价格与净值只能沿用最近收盘，
+    必须显式告知，否则「盘中收益 -100%」这类数字会被误读成真的暴跌。
+    """
+    price_source = getattr(snapshot, "price_source", None)
+    suspended = price_source == "停牌沿用收盘"
+    coverage = getattr(snapshot, "live_nav_coverage", None)
+    low_coverage = coverage is not None and coverage < 0.999
+    if not suspended and not low_coverage:
+        return None
+    holding_label = describe_signal(
+        getattr(snapshot, "current_holding", None),
+        getattr(snapshot, "current_theme", None),
+        getattr(snapshot, "current_name", None),
+    )
+    if suspended:
+        text = f"停牌提示: 当前持仓 {holding_label} 今日停牌/无实时价，价格与净值沿用最近收盘价"
+        if low_coverage:
+            text += f"，实时净值覆盖 {coverage:.0%}"
+        return text
+    return f"数据提示: 实时价覆盖仅 {coverage:.0%}，净值沿用最近收盘价"
+
+
 def format_market_message(snapshot: Any) -> str:
     momentum_text = format_ratio_percent(snapshot.current_momentum, digits=2)
     if snapshot.momentum_lookback_days is not None and snapshot.momentum_start_date and snapshot.momentum_end_date:
@@ -427,6 +452,7 @@ def format_market_message(snapshot: Any) -> str:
     )
     _, market_volume_summary = format_market_volume_summary(snapshot)
     historical_regime_summary = format_historical_regime_summary(snapshot)
+    suspension_note = format_suspension_note(snapshot)
     if snapshot.current_holding_date and snapshot.trade_date != snapshot.current_holding_date:
         title_text = f"ETF市场热度 {snapshot.trade_date}（确认数据截至 {snapshot.current_holding_date}）"
     else:
@@ -439,6 +465,8 @@ def format_market_message(snapshot: Any) -> str:
         f"建仓风险: {risk_text}, 建议 {advice_text}",
         historical_regime_summary,
     ]
+    if suspension_note is not None:
+        lines.append(suspension_note)
     if risk_scorecard is not None:
         lines.append(risk_scorecard)
     weak_trend_switch_line = None
@@ -541,6 +569,11 @@ def build_market_card(snapshot: Any) -> dict[str, Any]:
     )
     advice_text = snapshot.entry_advice if snapshot.entry_advice is not None else "N/A"
     signal_label = describe_signal(snapshot.current_signal, snapshot.current_signal_theme, snapshot.current_signal_name)
+    current_holding_label = describe_signal(
+        getattr(snapshot, "current_holding", None),
+        getattr(snapshot, "current_theme", None),
+        getattr(snapshot, "current_name", None),
+    )
     momentum_percentile_text = format_ratio_percent(snapshot.momentum_percentile, digits=1)
     drawdown_buffer_text = format_ratio_percent(snapshot.drawdown_buffer_ratio, digits=1)
     expectation_text = format_ratio_percent(snapshot.historical_avg_ret_60, digits=2)
@@ -564,8 +597,8 @@ def build_market_card(snapshot: Any) -> dict[str, Any]:
         {
             "tag": "div",
             "fields": [
-                {"is_short": True, "text": {"tag": "lark_md", "content": f"**当前信号**\n{signal_label}"}},
-                {"is_short": True, "text": {"tag": "lark_md", "content": f"**交易时段**\n{snapshot.market_session_label or 'N/A'}"}},
+                {"is_short": True, "text": {"tag": "lark_md", "content": f"**今日目标信号**（按今日收盘推演）\n{signal_label}"}},
+                {"is_short": True, "text": {"tag": "lark_md", "content": f"**当前确认持仓**\n{current_holding_label}"}},
             ],
         },
         {"tag": "markdown", "content": f"**25日主信号动量：{format_ratio_percent(snapshot.current_momentum, digits=2)}**"},
@@ -580,8 +613,11 @@ def build_market_card(snapshot: Any) -> dict[str, Any]:
         {"tag": "hr"},
         {"tag": "markdown", "content": f"**风险评分卡：{risk_scorecard}**"},
         {"tag": "markdown", "content": f"**历史同类区间**\n{historical_regime_summary}"},
-        {"tag": "markdown", "content": f"**市场量能**\n{market_volume_summary}"},
     ]
+    suspension_note = format_suspension_note(snapshot)
+    if suspension_note is not None:
+        elements.append({"tag": "markdown", "content": f"**{suspension_note}**"})
+    elements.append({"tag": "markdown", "content": f"**市场量能**\n{market_volume_summary}"})
     weak_trend_switch_line = None
     if (
         getattr(snapshot, "risk_leader", None)
