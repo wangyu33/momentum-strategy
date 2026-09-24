@@ -43,3 +43,8 @@ hello.py
 theme-config.json
 screenshot-*.png
 specs/doc_export/
+
+# value_strategy data cache (re-downloadable via run_download.py)
+value_strategy/output/data/
+value_strategy/__pycache__/
+value_strategy/**/__pycache__/
