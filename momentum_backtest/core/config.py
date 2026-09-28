@@ -7,7 +7,11 @@ from pathlib import Path
 import pandas as pd
 
 
-OUTPUT_DIR = Path("momentum_backtest/output")
+# 输出目录与**调用时的 cwd 解耦**：始终指向本项目（momentum_backtest）下的 output。
+# 旧实现是相对路径 Path("momentum_backtest/output")，只有从仓库根目录运行时才正确；
+# 从 momentum_backtest/ 内运行会在其下再套一层 momentum_backtest/output 脏目录（2026-09-24 踩到）。
+_PROJECT_DIR = Path(__file__).resolve().parents[1]
+OUTPUT_DIR = _PROJECT_DIR / "output"
 CORE_OUTPUT_DIR = OUTPUT_DIR / "core"
 ANALYSIS_OUTPUT_DIR = OUTPUT_DIR / "analysis"
 MONITOR_OUTPUT_DIR = OUTPUT_DIR / "monitor"

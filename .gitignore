@@ -48,3 +48,6 @@ specs/doc_export/
 value_strategy/output/data/
 value_strategy/__pycache__/
 value_strategy/**/__pycache__/
+
+# matplotlib font cache
+.mpl/
