@@ -7,6 +7,7 @@ from pathlib import Path
 
 import matplotlib
 from matplotlib import font_manager
+from matplotlib.lines import Line2D
 import pandas as pd
 
 matplotlib.use("Agg")
@@ -100,10 +101,12 @@ def build_contribution_summary(
     prices: pd.DataFrame,
     selected: pd.DataFrame,
     result: pd.DataFrame,
+    *,
+    window_start: pd.Timestamp | None = None,
+    window_end: pd.Timestamp | None = None,
 ) -> pd.DataFrame:
     returns = prices.pct_change(fill_method=None).reindex(result.index)
     prev_nav = result["nav"].shift(1).fillna(1.0)
-    total_profit = float(result["nav"].iloc[-1] - 1.0)
     codes = [str(code) for code in selected["code"]]
 
     weight_cols = [col for col in result.columns if col.startswith("weight_")]
@@ -130,6 +133,18 @@ def build_contribution_summary(
     turnover_share = turnover_by_code.div(turnover_nonzero, axis=0).fillna(0.0)
     cost_drag_by_code = turnover_share.mul(daily_cost_drag_total, axis=0)
     net_profit_by_code = gross_profit_by_code + cost_drag_by_code
+    if window_start is not None or window_end is not None:
+        mask = pd.Series(True, index=result.index)
+        if window_start is not None:
+            mask &= result.index >= window_start
+        if window_end is not None:
+            mask &= result.index <= window_end
+        gross_profit_by_code = gross_profit_by_code.loc[mask]
+        cost_drag_by_code = cost_drag_by_code.loc[mask]
+        net_profit_by_code = net_profit_by_code.loc[mask]
+        daily_net_profit_total = daily_net_profit_total.loc[mask]
+        confirmed_weights = confirmed_weights.loc[mask]
+    total_profit = float(daily_net_profit_total.sum())
     holding_mask = confirmed_weights.abs() > 1e-12
     total_holding_days = int(holding_mask.any(axis=1).sum())
 
@@ -190,6 +205,152 @@ def save_contribution_chart(contribution_df: pd.DataFrame, output_path: Path) ->
     ax.set_xlabel("Contribution Rate")
     fig.tight_layout()
     save_figure_atomic(fig, output_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
+def build_holding_style_maps(selected: pd.DataFrame) -> tuple[dict[str, str], dict[str, str]]:
+    palette = [
+        "#2b6cb0",
+        "#d64545",
+        "#1f9d55",
+        "#805ad5",
+        "#dd6b20",
+        "#319795",
+        "#b7791f",
+        "#718096",
+        "#c05621",
+        "#2f855a",
+    ]
+    codes = [str(code) for code in selected["code"]]
+    color_map = {code: palette[idx % len(palette)] for idx, code in enumerate(codes)}
+    color_map["CASH"] = "#a0aec0"
+    label_map = {str(row.code): str(row.theme) for row in selected.itertuples(index=False)}
+    label_map["CASH"] = "空仓"
+    return color_map, label_map
+
+
+def plot_nav_with_exposure_panels(
+    frame: pd.DataFrame,
+    selected: pd.DataFrame,
+    *,
+    title: str,
+    date_label: str,
+    output_path: Path,
+) -> None:
+    color_map, label_map = build_holding_style_maps(selected)
+    working = frame.copy()
+    exposure_series = pd.to_numeric(working.get("exposure", 0.0), errors="coerce").fillna(0.0)
+    holding_series = working.get("holding", pd.Series(index=working.index, dtype="object")).map(normalize_code)
+    holding_state = holding_series.where(exposure_series.abs() > 1e-12, "CASH").fillna("CASH")
+
+    fig, (ax_nav, ax_exp) = plt.subplots(
+        2,
+        1,
+        figsize=(14, 8),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1.0]},
+    )
+    states = holding_state.tolist()
+    shown_codes: set[str] = set()
+    segment_start = 0
+    for idx in range(1, len(working) + 1):
+        is_break = idx == len(working) or states[idx] != states[segment_start]
+        if not is_break:
+            continue
+        code = states[segment_start]
+        start_idx = max(segment_start - 1, 0)
+        segment = working.iloc[start_idx:idx]
+        ax_nav.plot(
+            segment.index,
+            segment["nav"],
+            color=color_map.get(code, "#4a5568"),
+            linewidth=2.3,
+            solid_capstyle="round",
+        )
+        shown_codes.add(code)
+        segment_start = idx
+    ax_nav.set_title(title, loc="left", fontsize=16, fontweight="bold")
+    ax_nav.set_ylabel("Net Value")
+
+    weight_cols = [col for col in working.columns if col.startswith("weight_")]
+    exposure_frame = pd.DataFrame(index=working.index)
+    for col in weight_cols:
+        code = col.removeprefix("weight_")
+        exposure_frame[code] = pd.to_numeric(working[col], errors="coerce").fillna(0.0)
+    if exposure_frame.empty:
+        exposure_frame["CASH"] = exposure_series.where(exposure_series <= 1e-12, 0.0)
+    else:
+        exposure_frame = exposure_frame.reindex(columns=[str(code) for code in selected["code"]], fill_value=0.0)
+        cash_series = (1.0 - exposure_frame.sum(axis=1)).clip(lower=0.0)
+        exposure_frame["CASH"] = cash_series
+    nonzero_cols = [col for col in exposure_frame.columns if float(exposure_frame[col].abs().sum()) > 1e-10]
+    if not nonzero_cols:
+        nonzero_cols = ["CASH"]
+        exposure_frame = pd.DataFrame({"CASH": pd.Series(1.0, index=working.index)})
+    plot_cols = nonzero_cols
+    for code in plot_cols:
+        ax_exp.step(
+            working.index,
+            exposure_frame[code] * 100.0,
+            where="post",
+            color=color_map.get(code, "#4a5568"),
+            linewidth=1.8,
+            label=label_map.get(code, code),
+        )
+    ax_exp.set_ylabel("仓位%")
+    ax_exp.set_xlabel(date_label)
+    ax_exp.set_ylim(0, 105)
+    ax_exp.axhline(0.0, color="#4a5568", linewidth=1.0)
+    legend_handles = [
+        Line2D([0], [0], color=color_map.get(code, "#4a5568"), lw=2.2, label=label_map.get(code, code))
+        for code in plot_cols
+    ]
+    ax_nav.legend(handles=legend_handles, ncol=min(4, len(plot_cols)), fontsize=8, loc="upper left")
+
+    fig.tight_layout()
+    save_figure_atomic(fig, output_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
+def save_recent_contribution_outputs(
+    prices: pd.DataFrame,
+    selected: pd.DataFrame,
+    result: pd.DataFrame,
+    *,
+    months: int = 6,
+) -> None:
+    recent_result = build_recent_window_frame(result, months=months)
+    if recent_result.empty:
+        return
+    recent_start = pd.Timestamp(recent_result.index.min()).normalize()
+    recent_end = pd.Timestamp(recent_result.index.max()).normalize()
+    contribution_df = build_contribution_summary(
+        prices,
+        selected,
+        result,
+        window_start=recent_start,
+        window_end=recent_end,
+    )
+    if contribution_df.empty:
+        return
+    write_dataframe_csv_atomic(
+        contribution_df,
+        CORE_OUTPUT_DIR / f"recent_{months}m_contribution_summary.csv",
+        index=False,
+    )
+
+    plt.style.use("seaborn-v0_8-whitegrid")
+    configure_matplotlib()
+    chart_df = contribution_df.sort_values("net_profit_contribution", ascending=True)
+    labels = [f"{row.theme}({row.code})" for row in chart_df.itertuples(index=False)]
+    colors = ["#1f9d55" if value >= 0 else "#d64545" for value in chart_df["net_contribution_rate"]]
+    fig, ax = plt.subplots(figsize=(14, 7))
+    ax.barh(labels, chart_df["net_contribution_rate"], color=colors)
+    ax.axvline(0.0, color="#4a5568", linewidth=1.0)
+    ax.set_title(f"Pool Contribution Rate to Recent {months}M Return", loc="left", fontsize=16, fontweight="bold")
+    ax.set_xlabel("Contribution Rate")
+    fig.tight_layout()
+    save_figure_atomic(fig, CORE_OUTPUT_DIR / f"recent_{months}m_contribution_rate.png", dpi=180, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -339,6 +500,109 @@ def save_analysis_outputs(
     save_analysis_drawdown_charts(result)
 
 
+def build_recent_window_frame(frame: pd.DataFrame, *, months: int = 3) -> pd.DataFrame:
+    if frame.empty:
+        return frame.copy()
+    latest_date = pd.Timestamp(frame.index.max()).normalize()
+    start_date = (latest_date - pd.DateOffset(months=months)).normalize()
+    recent = frame.loc[frame.index >= start_date].copy()
+    return recent if not recent.empty else frame.copy()
+
+
+def save_recent_core_charts(
+    selected: pd.DataFrame,
+    result: pd.DataFrame,
+    trades: pd.DataFrame,
+    prices: pd.DataFrame,
+    *,
+    lookback: int,
+    strategy_name: str,
+    months: int = 6,
+) -> None:
+    recent_result = build_recent_window_frame(result, months=months)
+    if recent_result.empty:
+        return
+
+    recent_start = pd.Timestamp(recent_result.index.min()).date().isoformat()
+    recent_end = pd.Timestamp(recent_result.index.max()).date().isoformat()
+    recent_trades = trades.copy()
+    if not recent_trades.empty and "date" in recent_trades.columns:
+        trade_dates = pd.to_datetime(recent_trades["date"], errors="coerce")
+        recent_trades = recent_trades.loc[trade_dates >= recent_result.index.min()].copy()
+
+    buy_trades = recent_trades[recent_trades["action"] == "BUY"] if not recent_trades.empty else pd.DataFrame()
+    sell_trades = recent_trades[recent_trades["action"] == "SELL"] if not recent_trades.empty else pd.DataFrame()
+
+    plot_nav_with_exposure_panels(
+        recent_result,
+        selected,
+        title=(
+        f"Recent {months}M NAV With Trades ({strategy_name}, lookback={lookback})",
+        ),
+        date_label=f"Date ({recent_start} -> {recent_end})",
+        output_path=CORE_OUTPUT_DIR / f"recent_{months}m_nav_with_trades.png",
+    )
+
+    drawdown = recent_result["nav"] / recent_result["nav"].cummax() - 1
+    max_dd_date = drawdown.idxmin()
+    max_dd_value = float(drawdown.loc[max_dd_date])
+    fig, ax = plt.subplots(figsize=(14, 6))
+    ax.plot(drawdown.index, drawdown, color="#d64545", linewidth=1.8)
+    ax.fill_between(drawdown.index, drawdown.values, 0, color="#f3b0b0", alpha=0.6)
+    ax.scatter([max_dd_date], [max_dd_value], color="#9b2c2c", s=70, zorder=3)
+    ax.annotate(
+        f"Max DD {max_dd_value:.2%}\n{max_dd_date.date()}",
+        xy=(max_dd_date, max_dd_value),
+        xytext=(12, -8),
+        textcoords="offset points",
+        fontsize=10,
+        color="#742a2a",
+        ha="left",
+        va="top",
+    )
+    ax.axhline(0.0, color="#4a5568", linewidth=1.0)
+    ax.set_title(f"Recent {months}M Drawdown vs Running Peak", loc="left", fontsize=16, fontweight="bold")
+    ax.set_xlabel(f"Date ({recent_start} -> {recent_end})")
+    ax.set_ylabel("Drawdown")
+    ax.yaxis.set_major_formatter(lambda x, pos: f"{x:.0%}")
+    fig.tight_layout()
+    save_figure_atomic(fig, CORE_OUTPUT_DIR / f"recent_{months}m_max_drawdown.png", dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+    compare_codes = ["510300", "159941"]
+    compare_labels = {
+        "510300": "HS300 Benchmark",
+        "159941": "Nasdaq ETF 159941",
+    }
+    compare_colors = {
+        "510300": "#d64545",
+        "159941": "#805ad5",
+    }
+    recent_prices = prices.reindex(recent_result.index)
+    fig, ax = plt.subplots(figsize=(14, 7))
+    ax.plot(recent_result.index, recent_result["nav"] / recent_result["nav"].iloc[0], color="#2b6cb0", linewidth=2.2, label="Strategy NAV")
+    for code in compare_codes:
+        if code not in recent_prices.columns:
+            continue
+        series = pd.to_numeric(recent_prices[code], errors="coerce").dropna()
+        if series.empty:
+            continue
+        normalized = series / float(series.iloc[0])
+        ax.plot(normalized.index, normalized.values, color=compare_colors[code], linewidth=2.0, label=compare_labels[code])
+    ax.set_title(
+        f"Recent {months}M Strategy vs HS300 vs Nasdaq",
+        loc="left",
+        fontsize=16,
+        fontweight="bold",
+    )
+    ax.set_xlabel(f"Date ({recent_start} -> {recent_end})")
+    ax.set_ylabel("Normalized NAV")
+    ax.legend()
+    fig.tight_layout()
+    save_figure_atomic(fig, CORE_OUTPUT_DIR / f"recent_{months}m_strategy_vs_hs300_nasdaq.png", dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
 def save_outputs(
     selected: pd.DataFrame,
     prices: pd.DataFrame,
@@ -359,24 +623,16 @@ def save_outputs(
     percentile_snapshot = build_current_etf_momentum_percentile_table(selected, prices, lookback=lookback)
     write_dataframe_csv_atomic(percentile_snapshot, CORE_OUTPUT_DIR / "etf_momentum_percentiles.csv", index=False)
 
-    buy_trades = trades[trades["action"] == "BUY"]
-    sell_trades = trades[trades["action"] == "SELL"]
     plt.style.use("seaborn-v0_8-whitegrid")
     configure_matplotlib()
 
-    fig, ax = plt.subplots(figsize=(14, 7))
-    ax.plot(result.index, result["nav"], color="#2b6cb0", linewidth=2.2, label="Strategy NAV")
-    if not buy_trades.empty:
-        ax.scatter(buy_trades["date"], buy_trades["nav"], color="#1f9d55", marker="^", s=55, label="Buy", zorder=3)
-    if not sell_trades.empty:
-        ax.scatter(sell_trades["date"], sell_trades["nav"], color="#d64545", marker="v", s=55, label="Sell", zorder=3)
-    ax.set_title(f"ETF Strategy NAV ({strategy_name}, lookback={lookback})", loc="left", fontsize=16, fontweight="bold")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Net Value")
-    ax.legend()
-    fig.tight_layout()
-    save_figure_atomic(fig, CORE_OUTPUT_DIR / "nav_with_trades.png", dpi=180, bbox_inches="tight")
-    plt.close(fig)
+    plot_nav_with_exposure_panels(
+        result,
+        selected,
+        title=f"ETF Strategy NAV ({strategy_name}, lookback={lookback})",
+        date_label="Date",
+        output_path=CORE_OUTPUT_DIR / "nav_with_trades.png",
+    )
 
     fig, ax = plt.subplots(figsize=(14, 5))
     ax.plot(result.index, result["current_momentum"], color="#dd6b20", linewidth=2.0)
@@ -426,6 +682,8 @@ def save_outputs(
     write_dataframe_csv_atomic(contribution_df, CORE_OUTPUT_DIR / "contribution_summary.csv", index=False)
     save_contribution_chart(contribution_df, CORE_OUTPUT_DIR / "contribution_rate.png")
     save_contribution_chart(contribution_df, CORE_OUTPUT_DIR / "contribution_rate_cn.png")
+    save_recent_core_charts(selected, result, trades, prices, lookback=lookback, strategy_name=strategy_name, months=6)
+    save_recent_contribution_outputs(prices, selected, result, months=6)
     save_analysis_outputs(selected, prices, result, trades, compare_df, contribution_df)
 
 

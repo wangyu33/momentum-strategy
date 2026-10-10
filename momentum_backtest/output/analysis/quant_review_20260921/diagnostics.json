@@ -1,0 +1,18 @@
+{
+  "prices_sha256": "0ec50de6bb5b63df5caf8fde91985031f43de5b06ca8ddce87663f058ec55f6e",
+  "start": "2012-05-28",
+  "end": "2026-09-21",
+  "n_rows": 3482,
+  "avg_exposure": 0.7740417229919399,
+  "single_asset_invested_days": 3117,
+  "full_exposure_days": 2269,
+  "cash_days": 365,
+  "strict_boll_changed_days": 2,
+  "split_adjustment": {
+    "changed_target_days": 0,
+    "first_changed_day": "NaT",
+    "last_changed_day": "NaT"
+  },
+  "warmup_note": "Selection lookback experiments change selection only; own percentile stays at production 25 days.",
+  "execution_note": "next_close delays targets and their costs one trading day; it is not a next-open simulation."
+}

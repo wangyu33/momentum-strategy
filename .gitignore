@@ -22,7 +22,9 @@ tmp/
 artifacts/
 
 # Strategy outputs and local runtime state
-momentum_backtest/output/
+momentum_backtest/output/*
+!momentum_backtest/output/core/
+!momentum_backtest/output/core/**
 domestic_etf_defensive_backtest/output/
 international_ma_backtest/output/
 international_risk_parity_backtest/output/

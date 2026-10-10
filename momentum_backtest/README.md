@@ -125,6 +125,14 @@ PYTHONPATH=.tools/python_packages python3 momentum_backtest/daily_monitor.py --p
 PYTHONPATH=.tools/python_packages python3 momentum_backtest/daily_momentum_board.py --preview-send
 ```
 
+桌面版入口：
+
+```bash
+bash scripts/open_momentum_desktop.command
+```
+
+Mac 上也可以直接双击 `scripts/open_momentum_desktop.command` 启动本地桌面窗口。
+
 ## 正式输出
 
 正式结果统一写到：
