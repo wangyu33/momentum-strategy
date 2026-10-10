@@ -272,3 +272,226 @@
 [2026-09-28 12:10:07] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
 [2026-09-28 12:10:33] [daily_monitor] snapshot ready: trade_date=2026-09-28, session=午间休市, holding=159985, desired=159985, exposure=1.0, slot=1210
 [2026-09-28 12:10:33] [daily_monitor] skip duplicate state: strategy=threshold_boll_extreme_cap, trade_date=2026-09-28, holding=159985, exposure=1.0
+[2026-09-28 14:50:10] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-28 14:50:10] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-28 14:50:39] [daily_monitor] snapshot ready: trade_date=2026-09-28, session=盘中, holding=159985, desired=159985, exposure=1.0, slot=1450
+[2026-09-28 14:50:39] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-09-28 14:50:40] [daily_monitor] webhook sent message 1/2
+[2026-09-28 14:50:42] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-09-28 14:50:43] [daily_monitor] webhook sent message 2/2
+[2026-09-28 14:50:43] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-09-28 14:50:43] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-29 09:40:09] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-29 09:40:09] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-29 09:40:34] [daily_monitor] snapshot ready: trade_date=2026-09-29, session=盘中, holding=159985, desired=159941, exposure=1.0, slot=0940
+[2026-09-29 09:40:34] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-09-29 09:40:36] [daily_monitor] webhook sent message 1/2
+[2026-09-29 09:40:37] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-09-29 09:40:38] [daily_monitor] webhook sent message 2/2
+[2026-09-29 09:40:38] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-09-29 09:40:38] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-29 11:09:54] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=True, disable_direct_feishu=False
+[2026-09-29 11:09:54] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-29 11:10:17] [daily_monitor] failed to fetch realtime ETF prices in main, use cached closes: failed to load realtime ETF prices: em: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response')) | sina: Can not decode value starting with character '<'
+[2026-09-29 11:10:25] [daily_monitor] snapshot ready: trade_date=2026-09-28, session=盘中, holding=159985, desired=159985, exposure=1.0, slot=0940
+[2026-09-29 11:10:25] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-09-29 11:10:25] [daily_monitor] delivery start message 1/2 pending=direct,webhook
+[2026-09-29 11:10:25] [daily_monitor] direct feishu send failed for message 1/2: Command '['./scripts/lark-cli', 'im', '+messages-send', '--as', 'bot', '--user-id', 'ou_a6a198ce5e9f97430f257a04b502f49b', '--msg-type', 'interactive', '--content', '{"config": {"wide_screen_mode": true}, "header": {"template": "yellow", "title": {"tag": "plain_text", "content": "ETF市场热度 2026-09-28"}}, "elements": [{"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**今日目标信号**（按今日收盘推演）\\n豆粕 / 豆粕ETF (159985)"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前确认持仓**\\n豆粕 / 豆粕ETF (159985)"}}]}, {"tag": "markdown", "content": "**25日主信号动量：4.67%**"}, {"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**策略热度**\\n4.67%"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**建仓风险**\\n48.8/100 (中)"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**建议**\\n谨慎建仓"}}]}, {"tag": "hr"}, {"tag": "markdown", "content": "**风险评分卡：动量分位 29.5%，回撤进度 35.4%，60日期望 7.69% / 分位 60.0%**"}, {"tag": "markdown", "content": "**历史同类区间**\\n同类60日: 风险高, 样本 188, 胜率 82%（百分位 65.0%）, 收益 7.69%, 回撤 -7.03%"}, {"tag": "markdown", "content": "**停牌提示: 当前持仓 豆粕 / 豆粕ETF (159985) 今日停牌/无实时价，价格与净值沿用最近收盘价，实时净值覆盖 0%**"}, {"tag": "markdown", "content": "**市场量能**\\n市场量能: 20/60=92.85%, 5/20=97.90%, 广度=-2.52%"}]}', '--idempotency-key', '5ce6fcb3-cabc-467a-80d4-1e2c4488ecd6']' returned non-zero exit status 1.
+[2026-09-29 11:10:26] [daily_monitor] webhook sent message 1/2
+[2026-09-29 11:10:28] [daily_monitor] delivery start message 2/2 pending=direct,webhook
+[2026-09-29 11:10:28] [daily_monitor] direct feishu send failed for message 2/2: Command '['./scripts/lark-cli', 'im', '+messages-send', '--as', 'bot', '--user-id', 'ou_a6a198ce5e9f97430f257a04b502f49b', '--msg-type', 'interactive', '--content', '{"config": {"wide_screen_mode": true}, "header": {"template": "wathet", "title": {"tag": "plain_text", "content": "ETF交易与回撤 2026-09-28"}}, "elements": [{"tag": "markdown", "content": "**当前确认持仓**\\n豆粕 / 豆粕ETF (159985) 100%"}, {"tag": "markdown", "content": "**今日目标组合**\\n豆粕 / 豆粕ETF (159985) 100%"}, {"tag": "hr"}, {"tag": "markdown", "content": "**今日交易**\\n无"}, {"tag": "markdown", "content": "**本次操作原因**\\n无"}, {"tag": "hr"}, {"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**上收净值**\\n2026-09-28 / 25.6754"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前净值**\\n2026-09-28 / 25.6754"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前回撤**\\n-5.87%"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**历史最大回撤**\\n-16.57%"}}]}, {"tag": "markdown", "content": "**历史最高净值**\\n27.2755 (2026-06-25)"}]}', '--idempotency-key', '04f29e3a-734e-414c-89ad-f2f8670b262b']' returned non-zero exit status 1.
+[2026-09-29 11:10:29] [daily_monitor] webhook sent message 2/2
+[2026-09-29 11:10:29] [daily_monitor] delivery summary: messages=2, direct_failures=2, webhook_failures=0
+[2026-09-29 11:10:29] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-29 12:10:09] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-29 12:10:09] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-29 12:10:35] [daily_monitor] snapshot ready: trade_date=2026-09-29, session=午间休市, holding=159985, desired=159985, exposure=1.0, slot=1210
+[2026-09-29 12:10:35] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-09-29 12:10:35] [daily_monitor] webhook sent message 1/2
+[2026-09-29 12:10:37] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-09-29 12:10:38] [daily_monitor] webhook sent message 2/2
+[2026-09-29 12:10:38] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-09-29 12:10:38] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-29 14:50:09] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-29 14:50:09] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-29 14:50:35] [daily_monitor] snapshot ready: trade_date=2026-09-29, session=盘中, holding=159985, desired=159941, exposure=1.0, slot=1450
+[2026-09-29 14:50:35] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-09-29 14:50:36] [daily_monitor] webhook sent message 1/2
+[2026-09-29 14:50:38] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-09-29 14:50:39] [daily_monitor] webhook sent message 2/2
+[2026-09-29 14:50:39] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-09-29 14:50:39] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-29 15:06:46] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=True, disable_direct_feishu=False
+[2026-09-29 15:06:46] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-29 15:07:28] [daily_monitor] snapshot ready: trade_date=2026-09-29, session=收盘后, holding=159941, desired=159941, exposure=1.0, slot=1450
+[2026-09-29 15:07:28] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-09-29 15:07:28] [daily_monitor] delivery start message 1/2 pending=direct,webhook
+[2026-09-29 15:07:29] [daily_monitor] direct feishu send failed for message 1/2: Command '['./scripts/lark-cli', 'im', '+messages-send', '--as', 'bot', '--user-id', 'ou_a6a198ce5e9f97430f257a04b502f49b', '--msg-type', 'interactive', '--content', '{"config": {"wide_screen_mode": true}, "header": {"template": "yellow", "title": {"tag": "plain_text", "content": "ETF市场热度 2026-09-29"}}, "elements": [{"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**今日目标信号**（按今日收盘推演）\\n纳指ETF / 纳指ETF广发 (159941)"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前确认持仓**\\n纳指ETF / 纳指ETF广发 (159941)"}}]}, {"tag": "markdown", "content": "**25日主信号动量：5.69%**"}, {"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**策略热度**\\n5.69%"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**建仓风险**\\n52.1/100 (中)"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**建议**\\n谨慎建仓"}}]}, {"tag": "hr"}, {"tag": "markdown", "content": "**风险评分卡：动量分位 38.1%，回撤进度 36.5%，60日期望 7.70% / 分位 65.0%**"}, {"tag": "markdown", "content": "**历史同类区间**\\n同类60日: 风险高, 样本 354, 胜率 80%（百分位 55.0%）, 收益 7.70%, 回撤 -7.37%"}, {"tag": "markdown", "content": "**市场量能**\\n市场量能: 20/60=92.85%, 5/20=97.90%, 广度=-2.52%"}]}', '--idempotency-key', 'd14315a0-f8f8-4d4d-a292-68c1a60b6bef']' returned non-zero exit status 1.
+[2026-09-29 15:07:29] [daily_monitor] webhook sent message 1/2
+[2026-09-29 15:07:31] [daily_monitor] delivery start message 2/2 pending=direct,webhook
+[2026-09-29 15:07:31] [daily_monitor] direct feishu send failed for message 2/2: Command '['./scripts/lark-cli', 'im', '+messages-send', '--as', 'bot', '--user-id', 'ou_a6a198ce5e9f97430f257a04b502f49b', '--msg-type', 'interactive', '--content', '{"config": {"wide_screen_mode": true}, "header": {"template": "wathet", "title": {"tag": "plain_text", "content": "ETF交易与回撤 2026-09-29"}}, "elements": [{"tag": "markdown", "content": "**当前确认持仓**\\n纳指ETF / 纳指ETF广发 (159941) 100%"}, {"tag": "markdown", "content": "**今日目标组合**\\n纳指ETF / 纳指ETF广发 (159941) 100%"}, {"tag": "hr"}, {"tag": "markdown", "content": "**今日交易**\\n买入 纳指ETF / 纳指ETF广发 (159941) 0%->100%；卖出 豆粕 / 豆粕ETF (159985) 100%->0%"}, {"tag": "markdown", "content": "**本次操作原因**\\n主信号指向 纳指ETF / 纳指ETF广发 (159941)，因为它在当前候选池里按 25 日信号质量排序位列第一，不是只看原始动量最大；信号动量 5.69%"}, {"tag": "hr"}, {"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**上收净值**\\n2026-09-29 / 25.6271"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前净值**\\n2026-09-29 / 25.6271"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前回撤**\\n-6.04%"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**历史最大回撤**\\n-16.57%"}}]}, {"tag": "markdown", "content": "**历史最高净值**\\n27.2755 (2026-06-25)"}]}', '--idempotency-key', '49c75c0f-130b-423b-ac45-b8f3f8257953']' returned non-zero exit status 1.
+[2026-09-29 15:07:32] [daily_monitor] webhook sent message 2/2
+[2026-09-29 15:07:32] [daily_monitor] delivery summary: messages=2, direct_failures=2, webhook_failures=0
+[2026-09-29 15:07:32] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-30 09:40:09] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-30 09:40:09] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-30 09:40:34] [daily_monitor] snapshot ready: trade_date=2026-09-30, session=盘中, holding=159941, desired=159985, exposure=1.0, slot=0940
+[2026-09-30 09:40:34] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-09-30 09:40:35] [daily_monitor] webhook sent message 1/2
+[2026-09-30 09:40:36] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-09-30 09:40:37] [daily_monitor] webhook sent message 2/2
+[2026-09-30 09:40:37] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-09-30 09:40:37] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-30 12:10:10] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-30 12:10:10] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-30 12:10:36] [daily_monitor] snapshot ready: trade_date=2026-09-30, session=午间休市, holding=159941, desired=159985, exposure=1.0, slot=1210
+[2026-09-30 12:10:36] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-09-30 12:10:37] [daily_monitor] webhook sent message 1/2
+[2026-09-30 12:10:39] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-09-30 12:10:40] [daily_monitor] webhook sent message 2/2
+[2026-09-30 12:10:40] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-09-30 12:10:40] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-30 14:07:57] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=True, disable_direct_feishu=False
+[2026-09-30 14:07:57] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-30 14:08:32] [daily_monitor] snapshot ready: trade_date=2026-09-30, session=盘中, holding=159941, desired=159941, exposure=1.0, slot=1210
+[2026-09-30 14:08:32] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-09-30 14:08:32] [daily_monitor] delivery start message 1/2 pending=direct,webhook
+[2026-09-30 14:08:32] [daily_monitor] direct feishu send failed for message 1/2: Command '['./scripts/lark-cli', 'im', '+messages-send', '--as', 'bot', '--user-id', 'ou_a6a198ce5e9f97430f257a04b502f49b', '--msg-type', 'interactive', '--content', '{"config": {"wide_screen_mode": true}, "header": {"template": "yellow", "title": {"tag": "plain_text", "content": "ETF市场热度 2026-09-30（确认截至 2026-09-29）"}}, "elements": [{"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**今日目标信号**（按今日收盘推演）\\n纳指ETF / 纳指ETF广发 (159941)"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前确认持仓**\\n纳指ETF / 纳指ETF广发 (159941)"}}]}, {"tag": "markdown", "content": "**25日主信号动量：5.66%**"}, {"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**策略热度**\\n5.66%"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**建仓风险**\\n57.0/100 (中)"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**建议**\\n谨慎建仓"}}]}, {"tag": "hr"}, {"tag": "markdown", "content": "**风险评分卡：动量分位 37.7%，回撤进度 27.2%，60日期望 7.46% / 分位 45.0%**"}, {"tag": "markdown", "content": "**历史同类区间**\\n同类60日: 风险高, 样本 360, 胜率 75%（百分位 40.0%）, 收益 7.46%, 回撤 -7.03%"}, {"tag": "markdown", "content": "**市场量能**\\n市场量能: 20/60=92.85%, 5/20=97.90%, 广度=-2.52%"}]}', '--idempotency-key', 'f27ffc61-c82e-4c71-a482-6d018f37cdea']' returned non-zero exit status 1.
+[2026-09-30 14:08:33] [daily_monitor] webhook sent message 1/2
+[2026-09-30 14:08:35] [daily_monitor] delivery start message 2/2 pending=direct,webhook
+[2026-09-30 14:08:35] [daily_monitor] direct feishu send failed for message 2/2: Command '['./scripts/lark-cli', 'im', '+messages-send', '--as', 'bot', '--user-id', 'ou_a6a198ce5e9f97430f257a04b502f49b', '--msg-type', 'interactive', '--content', '{"config": {"wide_screen_mode": true}, "header": {"template": "wathet", "title": {"tag": "plain_text", "content": "ETF交易与回撤 2026-09-30（确认截至 2026-09-29）"}}, "elements": [{"tag": "markdown", "content": "**当前确认持仓**\\n纳指ETF / 纳指ETF广发 (159941) 100%"}, {"tag": "markdown", "content": "**今日目标组合**\\n纳指ETF / 纳指ETF广发 (159941) 100%"}, {"tag": "hr"}, {"tag": "markdown", "content": "**今日交易**\\n无"}, {"tag": "markdown", "content": "**本次操作原因**\\n无"}, {"tag": "hr"}, {"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**上收净值**\\n2026-09-29 / 25.6271"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前净值**\\n2026-09-30 / 26.0472"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前回撤**\\n-4.50%"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**历史最大回撤**\\n-16.57%"}}]}, {"tag": "markdown", "content": "**历史最高净值**\\n27.2755 (2026-06-25)"}]}', '--idempotency-key', '2f892934-89cc-4036-928c-10ab8c3c59f0']' returned non-zero exit status 1.
+[2026-09-30 14:08:36] [daily_monitor] webhook sent message 2/2
+[2026-09-30 14:08:36] [daily_monitor] delivery summary: messages=2, direct_failures=2, webhook_failures=0
+[2026-09-30 14:08:36] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-30 14:50:09] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-09-30 14:50:09] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-09-30 14:50:38] [daily_monitor] snapshot ready: trade_date=2026-09-30, session=盘中, holding=159941, desired=159941, exposure=1.0, slot=1450
+[2026-09-30 14:50:38] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-09-30 14:50:39] [daily_monitor] webhook sent message 1/2
+[2026-09-30 14:50:41] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-09-30 14:50:42] [daily_monitor] webhook sent message 2/2
+[2026-09-30 14:50:42] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-09-30 14:50:42] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-01 09:40:05] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-01 09:40:05] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-01 09:40:05] [daily_monitor] skip non-trading day: 2026-10-01
+[2026-10-01 12:16:26] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-01 12:16:26] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-01 12:16:26] [daily_monitor] skip non-trading day: 2026-10-01
+[2026-10-01 14:50:20] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-01 14:50:20] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-01 14:50:20] [daily_monitor] skip non-trading day: 2026-10-01
+[2026-10-02 09:41:04] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-02 09:41:04] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-02 09:41:04] [daily_monitor] skip non-trading day: 2026-10-02
+[2026-10-02 12:10:05] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-02 12:10:05] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-02 12:10:05] [daily_monitor] skip non-trading day: 2026-10-02
+[2026-10-02 14:50:38] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-02 14:50:38] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-02 14:50:38] [daily_monitor] skip non-trading day: 2026-10-02
+[2026-10-05 09:40:09] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-05 09:40:09] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-05 09:40:10] [daily_monitor] skip non-trading day: 2026-10-05
+[2026-10-05 12:10:08] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-05 12:10:08] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-05 12:10:09] [daily_monitor] skip non-trading day: 2026-10-05
+[2026-10-05 14:50:09] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-05 14:50:09] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-05 14:50:10] [daily_monitor] skip non-trading day: 2026-10-05
+[2026-10-06 09:54:00] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-06 09:54:00] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-06 09:54:01] [daily_monitor] skip non-trading day: 2026-10-06
+[2026-10-06 12:18:29] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-06 12:18:29] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-06 12:18:29] [daily_monitor] skip non-trading day: 2026-10-06
+[2026-10-06 14:50:33] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-06 14:50:33] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-06 14:50:34] [daily_monitor] skip non-trading day: 2026-10-06
+[2026-10-07 09:40:36] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-07 09:40:36] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-07 09:40:36] [daily_monitor] skip non-trading day: 2026-10-07
+[2026-10-07 12:10:13] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-07 12:10:13] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-07 12:10:13] [daily_monitor] skip non-trading day: 2026-10-07
+[2026-10-07 14:56:20] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-07 14:56:20] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-07 14:56:21] [daily_monitor] skip non-trading day: 2026-10-07
+[2026-10-08 09:55:21] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-08 09:55:21] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-08 10:04:56] [daily_monitor] snapshot ready: trade_date=2026-10-08, session=盘中, holding=159941, desired=159941, exposure=1.0, slot=0940
+[2026-10-08 10:04:56] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-10-08 10:04:57] [daily_monitor] webhook sent message 1/2
+[2026-10-08 10:04:59] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-10-08 10:05:00] [daily_monitor] webhook sent message 2/2
+[2026-10-08 10:05:00] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-10-08 10:05:00] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-08 11:25:16] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=True, disable_direct_feishu=False
+[2026-10-08 11:25:16] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-08 11:26:49] [daily_monitor] snapshot ready: trade_date=2026-10-08, session=盘中, holding=159941, desired=159941, exposure=1.0, slot=0940
+[2026-10-08 11:26:49] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-10-08 11:26:49] [daily_monitor] delivery start message 1/2 pending=direct,webhook
+[2026-10-08 11:26:49] [daily_monitor] direct feishu send failed for message 1/2: Command '['./scripts/lark-cli', 'im', '+messages-send', '--as', 'bot', '--user-id', 'ou_a6a198ce5e9f97430f257a04b502f49b', '--msg-type', 'interactive', '--content', '{"config": {"wide_screen_mode": true}, "header": {"template": "yellow", "title": {"tag": "plain_text", "content": "ETF市场热度 2026-10-08（确认截至 2026-09-30）"}}, "elements": [{"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**今日目标信号**（按今日收盘推演）\\n纳指ETF / 纳指ETF广发 (159941)"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前确认持仓**\\n纳指ETF / 纳指ETF广发 (159941)"}}]}, {"tag": "markdown", "content": "**25日主信号动量：7.47%**"}, {"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**策略热度**\\n7.47%"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**建仓风险**\\n69.7/100 (中)"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**建议**\\n谨慎建仓"}}]}, {"tag": "hr"}, {"tag": "markdown", "content": "**风险评分卡：动量分位 52.5%，回撤进度 16.2%，60日期望 7.46% / 分位 45.0%**"}, {"tag": "markdown", "content": "**历史同类区间**\\n同类60日: 风险高, 样本 360, 胜率 75%（百分位 40.0%）, 收益 7.46%, 回撤 -7.03%"}, {"tag": "markdown", "content": "**市场量能**\\n市场量能: 20/60=90.74%, 5/20=90.77%, 广度=-4.55%"}]}', '--idempotency-key', '0a0956c8-cc1c-42a5-8d65-04fc1feb8784']' returned non-zero exit status 1.
+[2026-10-08 11:26:50] [daily_monitor] webhook sent message 1/2
+[2026-10-08 11:26:51] [daily_monitor] delivery start message 2/2 pending=direct,webhook
+[2026-10-08 11:26:51] [daily_monitor] direct feishu send failed for message 2/2: Command '['./scripts/lark-cli', 'im', '+messages-send', '--as', 'bot', '--user-id', 'ou_a6a198ce5e9f97430f257a04b502f49b', '--msg-type', 'interactive', '--content', '{"config": {"wide_screen_mode": true}, "header": {"template": "wathet", "title": {"tag": "plain_text", "content": "ETF交易与回撤 2026-10-08（确认截至 2026-09-30）"}}, "elements": [{"tag": "markdown", "content": "**当前确认持仓**\\n纳指ETF / 纳指ETF广发 (159941) 100%"}, {"tag": "markdown", "content": "**今日目标组合**\\n纳指ETF / 纳指ETF广发 (159941) 100%"}, {"tag": "hr"}, {"tag": "markdown", "content": "**今日交易**\\n无"}, {"tag": "markdown", "content": "**本次操作原因**\\n无"}, {"tag": "hr"}, {"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**上收净值**\\n2026-09-30 / 26.0322"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前净值**\\n2026-10-08 / 26.5423"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前回撤**\\n-2.69%"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**历史最大回撤**\\n-16.57%"}}]}, {"tag": "markdown", "content": "**历史最高净值**\\n27.2755 (2026-06-25)"}]}', '--idempotency-key', '2fee98c4-5356-44d7-b397-86bd55e1c8bf']' returned non-zero exit status 1.
+[2026-10-08 11:26:52] [daily_monitor] webhook sent message 2/2
+[2026-10-08 11:26:52] [daily_monitor] delivery summary: messages=2, direct_failures=2, webhook_failures=0
+[2026-10-08 11:26:52] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-08 12:10:09] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-08 12:10:09] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-08 12:11:17] [daily_monitor] snapshot ready: trade_date=2026-10-08, session=午间休市, holding=159941, desired=159941, exposure=1.0, slot=1210
+[2026-10-08 12:11:17] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-10-08 12:11:18] [daily_monitor] webhook sent message 1/2
+[2026-10-08 12:11:20] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-10-08 12:11:20] [daily_monitor] webhook sent message 2/2
+[2026-10-08 12:11:20] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-10-08 12:11:20] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-08 14:50:09] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-08 14:50:10] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-08 14:51:18] [daily_monitor] snapshot ready: trade_date=2026-10-08, session=盘中, holding=159941, desired=159941, exposure=1.0, slot=1450
+[2026-10-08 14:51:19] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-10-08 14:51:20] [daily_monitor] webhook sent message 1/2
+[2026-10-08 14:51:21] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-10-08 14:51:22] [daily_monitor] webhook sent message 2/2
+[2026-10-08 14:51:22] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-10-08 14:51:22] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-09 09:40:10] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-09 09:40:10] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-09 09:40:58] [daily_monitor] snapshot ready: trade_date=2026-10-09, session=盘中, holding=159941, desired=512890, exposure=1.0, slot=0940
+[2026-10-09 09:40:58] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-10-09 09:41:00] [daily_monitor] webhook sent message 1/2
+[2026-10-09 09:41:01] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-10-09 09:41:02] [daily_monitor] webhook sent message 2/2
+[2026-10-09 09:41:02] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-10-09 09:41:02] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-09 11:20:03] [daily_monitor] start strategy=default, force=True, preview_send=False, debug=True, disable_direct_feishu=False
+[2026-10-09 11:20:03] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-09 11:20:50] [daily_monitor] snapshot ready: trade_date=2026-10-09, session=盘中, holding=159941, desired=512890, exposure=1.0, slot=0940
+[2026-10-09 11:20:50] [daily_monitor] force mode enabled: state cache will be ignored
+[2026-10-09 11:20:50] [daily_monitor] delivery start message 1/2 pending=direct,webhook
+[2026-10-09 11:20:50] [daily_monitor] direct feishu send failed for message 1/2: Command '['./scripts/lark-cli', 'im', '+messages-send', '--as', 'bot', '--user-id', 'ou_a6a198ce5e9f97430f257a04b502f49b', '--msg-type', 'interactive', '--content', '{"config": {"wide_screen_mode": true}, "header": {"template": "yellow", "title": {"tag": "plain_text", "content": "ETF市场热度 2026-10-09（确认截至 2026-10-08）"}}, "elements": [{"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**今日目标信号**（按今日收盘推演）\\n红利低波ETF / 红利低波ETF华泰柏瑞 (512890)"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前确认持仓**\\n纳指ETF / 纳指ETF广发 (159941)"}}]}, {"tag": "markdown", "content": "**25日主信号动量：2.70%**"}, {"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**策略热度**\\n2.70%"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**建仓风险**\\n51.7/100 (中)"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**建议**\\n谨慎建仓"}}]}, {"tag": "hr"}, {"tag": "markdown", "content": "**风险评分卡：动量分位 22.6%，回撤进度 24.5%，60日期望 7.30% / 分位 40.0%**"}, {"tag": "markdown", "content": "**历史同类区间**\\n同类60日: 风险高, 样本 177, 胜率 69%（百分位 25.0%）, 收益 7.30%, 回撤 -7.09%"}, {"tag": "markdown", "content": "**市场量能**\\n市场量能: 20/60=90.43%, 5/20=90.55%, 广度=-4.55%"}]}', '--idempotency-key', '330ca4f7-28b8-45c8-b907-9539b6807a94']' returned non-zero exit status 1.
+[2026-10-09 11:20:52] [daily_monitor] webhook sent message 1/2
+[2026-10-09 11:20:53] [daily_monitor] delivery start message 2/2 pending=direct,webhook
+[2026-10-09 11:20:53] [daily_monitor] direct feishu send failed for message 2/2: Command '['./scripts/lark-cli', 'im', '+messages-send', '--as', 'bot', '--user-id', 'ou_a6a198ce5e9f97430f257a04b502f49b', '--msg-type', 'interactive', '--content', '{"config": {"wide_screen_mode": true}, "header": {"template": "wathet", "title": {"tag": "plain_text", "content": "ETF交易与回撤 2026-10-09（确认截至 2026-10-08）"}}, "elements": [{"tag": "markdown", "content": "**当前确认持仓**\\n纳指ETF / 纳指ETF广发 (159941) 100%"}, {"tag": "markdown", "content": "**今日目标组合**\\n红利低波ETF / 红利低波ETF华泰柏瑞 (512890) 100%"}, {"tag": "hr"}, {"tag": "markdown", "content": "**今日交易**\\n卖出 纳指ETF / 纳指ETF广发 (159941) 100%->0%；买入 红利低波ETF / 红利低波ETF华泰柏瑞 (512890) 0%->100%"}, {"tag": "markdown", "content": "**本次操作原因**\\n主信号指向 红利低波ETF / 红利低波ETF华泰柏瑞 (512890)，因为它在当前候选池里按 25 日信号质量排序位列第一，不是只看原始动量最大；信号动量 2.70%"}, {"tag": "hr"}, {"tag": "div", "fields": [{"is_short": true, "text": {"tag": "lark_md", "content": "**上收净值**\\n2026-10-08 / 26.1972"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前净值**\\n2026-10-09 / 26.1672"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**当前回撤**\\n-4.06%"}}, {"is_short": true, "text": {"tag": "lark_md", "content": "**历史最大回撤**\\n-16.57%"}}]}, {"tag": "markdown", "content": "**历史最高净值**\\n27.2755 (2026-06-25)"}]}', '--idempotency-key', 'd363b4cc-8e13-4c35-b459-0fdf18b3dfaa']' returned non-zero exit status 1.
+[2026-10-09 11:20:54] [daily_monitor] webhook sent message 2/2
+[2026-10-09 11:20:54] [daily_monitor] delivery summary: messages=2, direct_failures=2, webhook_failures=0
+[2026-10-09 11:20:54] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-09 12:10:09] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-09 12:10:09] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-09 12:10:42] [daily_monitor] snapshot ready: trade_date=2026-10-09, session=午间休市, holding=159941, desired=512890, exposure=1.0, slot=1210
+[2026-10-09 12:10:42] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-10-09 12:10:43] [daily_monitor] webhook sent message 1/2
+[2026-10-09 12:10:45] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-10-09 12:10:46] [daily_monitor] webhook sent message 2/2
+[2026-10-09 12:10:46] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-10-09 12:10:46] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-09 14:50:04] [daily_monitor] start strategy=default, force=False, preview_send=False, debug=False, disable_direct_feishu=True
+[2026-10-09 14:50:04] [daily_monitor] state_file=/Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
+[2026-10-09 14:50:38] [daily_monitor] snapshot ready: trade_date=2026-10-09, session=盘中, holding=159941, desired=159941, exposure=1.0, slot=1450
+[2026-10-09 14:50:38] [daily_monitor] delivery start message 1/2 pending=webhook
+[2026-10-09 14:50:39] [daily_monitor] webhook sent message 1/2
+[2026-10-09 14:50:40] [daily_monitor] delivery start message 2/2 pending=webhook
+[2026-10-09 14:50:41] [daily_monitor] webhook sent message 2/2
+[2026-10-09 14:50:41] [daily_monitor] delivery summary: messages=2, direct_failures=0, webhook_failures=0
+[2026-10-09 14:50:41] [daily_monitor] state saved to /Users/bytedance/wy_test/momentum-strategy/momentum_backtest/output/monitor/daily_monitor_state.json
